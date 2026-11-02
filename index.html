@@ -7,23 +7,28 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
-        .timeline-container { position: relative; height: 65px; background: #f1f5f9; border-radius: 6px; margin-bottom: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
-        .timeline-block { position: absolute; top: 0; bottom: 0; background: #dbeafe; border: 1px solid #93c5fd; border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); z-index: 10; overflow: hidden; }
-        .timeline-block select, .timeline-block input { width: 100%; border: 1px solid #bfdbfe; border-radius: 3px; padding: 1px; font-size: 11px; background: white; }
+        .timeline-container { position: relative; height: 60px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .drop-zone { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        .drop-zone.drag-over { background: rgba(59, 130, 246, 0.1); border: 2px dashed #3b82f6; }
+        .timeline-block { position: absolute; top: 5px; bottom: 5px; background: #dbeafe; border: 1px solid #60a5fa; border-radius: 6px; padding: 4px; display: flex; flex-direction: column; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10; cursor: grab; overflow: hidden; transition: transform 0.1s; }
+        .timeline-block:active { cursor: grabbing; transform: scale(1.02); }
+        .timeline-block select { width: 100%; border: 1px solid #bfdbfe; border-radius: 3px; padding: 1px; font-size: 10px; background: white; margin-top: 2px;}
+        .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
     </style>
 </head>
-<body class="bg-gray-100 flex h-screen overflow-hidden text-slate-800">
+<body class="bg-slate-100 flex h-screen overflow-hidden text-slate-800 font-sans">
 
+    <!-- 左側選單 -->
     <aside class="w-64 bg-slate-800 text-white flex flex-col shadow-lg z-20">
-        <div class="p-4 text-xl font-bold border-b border-slate-700 flex items-center gap-2">🏥 智能排班系統</div>
+        <div class="p-4 text-lg font-bold border-b border-slate-700 flex items-center gap-2">🏥 智能排班系統</div>
         
         <div id="loginArea" class="p-4 border-b border-slate-700 bg-slate-900">
             <input type="text" id="loginId" placeholder="輸入員工編號" class="w-full text-black p-2 rounded mb-2 text-sm">
             <button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-500 rounded py-2 text-sm font-bold">登入系統</button>
         </div>
-        <div id="userInfo" class="p-4 border-b border-slate-700 bg-slate-900 hidden">
-            <div class="text-green-400 text-sm font-bold mb-2" id="userNameDisplay"></div>
-            <button onclick="location.reload()" class="text-xs text-slate-400 hover:text-white underline">登出</button>
+        <div id="userInfo" class="p-4 border-b border-slate-700 bg-slate-900 hidden flex justify-between items-center">
+            <div class="text-green-400 text-sm font-bold" id="userNameDisplay"></div>
+            <button onclick="logout()" class="text-xs text-slate-400 hover:text-white underline">登出</button>
         </div>
 
         <div class="p-3 text-sm text-slate-400 font-bold bg-slate-800">👁️ 班表總覽</div>
@@ -31,88 +36,107 @@
 
         <div id="adminMenu" class="hidden flex-col border-t-2 border-slate-600 bg-slate-700 pb-4">
             <div class="p-3 text-sm text-yellow-400 font-bold">🔒 排班管理專區</div>
-            <ul id="adminDeptList" class="px-2 space-y-1 overflow-y-auto max-h-48 mb-2"></ul>
+            <ul id="adminDeptList" class="px-2 space-y-1 overflow-y-auto max-h-40 mb-2"></ul>
             <hr class="border-slate-600 mx-2 mb-2">
-            <ul class="px-2">
-                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-yellow-200 font-bold" onclick="showEmployeeMaint()">👥 員工組別維護</li>
+            <ul class="px-2 space-y-1">
+                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-yellow-200 text-sm font-bold" onclick="showEmployeeMaint()">👥 員工組別維護</li>
+                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-green-300 text-sm font-bold" onclick="showTaskMaint()">📋 工作項目維護</li>
             </ul>
         </div>
     </aside>
 
+    <!-- 主內容區 -->
     <main id="mainContent" class="flex-1 p-6 overflow-y-auto relative w-full">
-        <div id="loadingMsg" class="flex flex-col items-center justify-center h-full text-slate-500">
-            <div class="text-4xl mb-4 animate-spin">⏳</div>
-            <div class="text-xl">系統資料載入中，請稍候...</div>
-        </div>
-
-        <div id="welcomeMsg" class="hidden flex flex-col items-center justify-center h-full text-slate-400">
-            <div class="text-6xl mb-4">👋</div>
-            <div class="text-2xl font-bold">歡迎使用排班系統</div>
+        <!-- 狀態提示 -->
+        <div id="statusToast" class="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg hidden z-50 transition-opacity">已儲存</div>
+        
+        <div id="welcomeMsg" class="flex flex-col items-center justify-center h-full text-slate-400">
+            <div class="text-6xl mb-4">👋</div><div class="text-2xl font-bold">歡迎使用，請選擇部門</div>
         </div>
         
+        <!-- 公開檢視 (Google Charts) -->
         <div id="publicView" class="hidden h-full flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h2 id="publicTitle" class="text-2xl font-bold text-slate-700"></h2>
-                <input type="date" id="publicDate" class="border p-2 rounded shadow-sm" onchange="renderPublicChart()">
+                <input type="date" id="publicDate" class="border p-2 rounded" onchange="renderPublicChart()">
             </div>
             <div id="timeline_chart" class="bg-white p-4 shadow rounded flex-1 min-h-[400px]"></div>
         </div>
 
+        <!-- 管理員排班 -->
         <div id="adminView" class="hidden">
-            <h2 id="adminTitle" class="text-2xl font-bold mb-6 text-blue-700 border-b-2 border-blue-200 pb-2"></h2>
+            <h2 id="adminTitle" class="text-2xl font-bold mb-4 text-blue-700 border-b-2 border-blue-200 pb-2"></h2>
             
-            <div class="bg-white p-5 rounded shadow mb-6 flex flex-wrap items-end gap-6 border-l-4 border-indigo-500">
-                <div>
-                    <label class="block text-sm font-bold text-slate-600 mb-1">🔍 步驟1：預覽舊月份</label>
-                    <input type="month" id="previewMonth" class="border p-2 rounded w-48 shadow-sm" onchange="renderInteractiveGrid()">
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-slate-600 mb-1">🎯 步驟2：目標承襲月份</label>
-                    <input type="month" id="targetMonth" class="border p-2 rounded w-48 shadow-sm">
-                </div>
-                <button onclick="copyMonthSchedule()" class="bg-indigo-600 text-white px-6 py-2 rounded font-bold shadow hover:bg-indigo-700">🔄 執行承襲套用</button>
+            <div class="bg-white p-4 rounded shadow mb-4 flex flex-wrap items-end gap-4 border-l-4 border-indigo-500">
+                <div><label class="block text-xs font-bold text-slate-500">預覽月份</label><input type="month" id="previewMonth" class="border p-1 rounded w-40" onchange="renderInteractiveGrid()"></div>
+                <div><label class="block text-xs font-bold text-slate-500">目標承襲月份</label><input type="month" id="targetMonth" class="border p-1 rounded w-40"></div>
+                <button onclick="copyMonthSchedule()" class="bg-indigo-600 text-white px-4 py-1 rounded shadow hover:bg-indigo-700">執行承襲套用</button>
             </div>
 
             <div class="bg-white p-5 rounded shadow">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="font-bold text-xl">🎨 每日互動排班圖</h3>
-                    <input type="date" id="interactiveDate" class="border p-2 rounded shadow-sm" onchange="renderInteractiveGrid()">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-4">
+                        <input type="date" id="interactiveDate" class="border p-2 rounded shadow-sm text-lg font-bold" onchange="renderInteractiveGrid()">
+                        
+                        <!-- 雙模式切換 -->
+                        <div class="bg-slate-200 rounded p-1 flex font-bold text-sm">
+                            <button id="btnModePerson" onclick="switchMode('person')" class="px-4 py-1 rounded bg-white shadow text-blue-600">平日模式(以人為主)</button>
+                            <button id="btnModeTask" onclick="switchMode('task')" class="px-4 py-1 rounded text-slate-500 hover:text-slate-700">假日模式(以工作為主)</button>
+                        </div>
+                    </div>
+                    <button onclick="openShiftModal()" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-1">➕ 新增班表</button>
                 </div>
-                <div id="interactiveGrid" class="w-full relative mt-4"></div>
+                
+                <!-- 互動網格 -->
+                <div id="interactiveGrid" class="w-full relative border border-slate-200 rounded overflow-hidden bg-white"></div>
             </div>
         </div>
 
+        <!-- 維護畫面 -->
         <div id="employeeAdminView" class="hidden">
-            <div class="flex justify-between items-center mb-6 border-b-2 border-slate-200 pb-2">
-                <h2 class="text-2xl font-bold text-slate-700">👥 員工清單維護</h2>
-                <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">更新寫入：外部名冊</span>
-            </div>
-            <div class="bg-white rounded shadow overflow-hidden">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-slate-800 text-white">
-                        <tr>
-                            <th class="py-3 px-4 text-left">編號</th><th class="py-3 px-4 text-left">姓名</th>
-                            <th class="py-3 px-4 text-left">所屬單位</th><th class="py-3 px-4 text-left">所屬組別 (排班)</th>
-                            <th class="py-3 px-4 text-center">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="employeeTableBody" class="divide-y divide-slate-200"></tbody>
-                </table>
-            </div>
+            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">👥 員工組別維護</h2>
+            <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">編號</th><th class="p-2">姓名</th><th class="p-2">組別</th><th class="p-2">操作</th></tr></thead><tbody id="empTableBody"></tbody></table></div>
+        </div>
+        <div id="taskAdminView" class="hidden">
+            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">📋 工作項目維護</h2>
+            <button onclick="addTask()" class="mb-4 bg-blue-600 text-white px-4 py-2 rounded font-bold shadow">➕ 新增工作</button>
+            <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">工作名稱</th><th class="p-2">預設類別</th><th class="p-2">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
         </div>
     </main>
 
-    <!-- 系統設定與模組載入 -->
-    <script>
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbzT3uS_MBktdkAQYXo4ZM9_TJ90wkmtRnGf2MWA8R6KDL260qv4s1xB7XmRyg7z4lSq/exec';
-        let appData = { depts: [], staff: [], tasks: [], shifts: [], auths: [] };
-    </script>
+    <!-- 排班編輯 Modal -->
+    <div id="shiftModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-lg shadow-xl w-96 p-6">
+            <h3 class="text-xl font-bold mb-4 text-blue-700" id="modalTitle">新增/編輯班表</h3>
+            <input type="hidden" id="modalShiftId">
+            <div class="space-y-3">
+                <div><label class="text-sm font-bold">人員</label><select id="modalEmp" class="w-full border p-2 rounded"></select></div>
+                <div><label class="text-sm font-bold">工作</label><select id="modalTask" class="w-full border p-2 rounded"></select></div>
+                <div class="flex gap-2">
+                    <div class="w-1/2"><label class="text-sm font-bold">開始(HH:MM)</label><input type="time" id="modalStart" class="w-full border p-2 rounded"></div>
+                    <div class="w-1/2"><label class="text-sm font-bold">結束(HH:MM)</label><input type="time" id="modalEnd" class="w-full border p-2 rounded"></div>
+                </div>
+                <div><label class="text-sm font-bold">類別</label><select id="modalCat" class="w-full border p-2 rounded"><option value="常規">常規</option><option value="特別備註">特別備註</option></select></div>
+                <div><label class="text-sm font-bold">備註</label><input type="text" id="modalRemark" class="w-full border p-2 rounded"></div>
+            </div>
+            <div class="mt-6 flex justify-between">
+                <button onclick="deleteShift()" id="btnDeleteShift" class="text-red-500 font-bold hover:bg-red-50 px-3 py-1 rounded">刪除</button>
+                <div class="space-x-2">
+                    <button onclick="closeShiftModal()" class="px-4 py-2 border rounded font-bold text-slate-600">取消</button>
+                    <button onclick="saveShift()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">儲存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 載入模組化 JS -->
+    <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/publicView.js"></script>
     <script src="js/scheduleAdmin.js"></script>
-    <script src="js/employeeAdmin.js"></script>
+    <script src="js/maintenance.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
