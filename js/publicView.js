@@ -17,13 +17,35 @@ function renderPublicChart() {
     dataTable.addColumn({ type: 'date', id: '開始時間' }); 
     dataTable.addColumn({ type: 'date', id: '結束時間' });
     
-    const shifts = appData.shifts.filter(s => s['部門名稱'] === currentPublicDept && s['日期'] === document.getElementById('publicDate').value);
-    if(shifts.length === 0) return container.innerHTML = '<div class="text-center p-10 text-slate-500">當日無排班</div>';
+    const date = document.getElementById('publicDate').value;
+    const shifts = appData.shifts.filter(s => s['部門名稱'] === currentPublicDept && s['日期'] === date);
     
-    const rows = shifts.map(s => {
+    // 處理頂部與底部備註顯示
+    const dailyRemarkShift = shifts.find(s => s['員工編號'] === 'SYS_REMARK') || {};
+    const topRemark = dailyRemarkShift['備註'];
+    const bottomRemark = dailyRemarkShift['備註2'];
+    
+    const topDiv = document.getElementById('publicTopRemark');
+    if(topRemark) { topDiv.innerText = `📢 本日佈達：${topRemark}`; topDiv.classList.remove('hidden'); }
+    else { topDiv.classList.add('hidden'); }
+
+    const bottomDiv = document.getElementById('publicBottomRemark');
+    if(bottomRemark) { bottomDiv.innerText = `📢 補充事項：${bottomRemark}`; bottomDiv.classList.remove('hidden'); }
+    else { bottomDiv.classList.add('hidden'); }
+
+    const validShifts = shifts.filter(s => s['員工編號'] !== 'SYS_REMARK');
+    if(validShifts.length === 0) return container.innerHTML = '<div class="text-center p-10 text-slate-500 font-bold">當日尚無排班資料</div>';
+    
+    const rows = validShifts.map(s => {
         const name = (appData.staff.find(e => e['員工編號'] == s['員工編號']) || {})['姓名'] || s['員工編號'];
         const [sh, sm] = (s['開始時間']||'00:00').split(':'); const [eh, em] = (s['結束時間']||'00:00').split(':');
-        return [name, s['工作名稱'], `<div style="padding:10px;"><b>${name}</b><br>工作：${s['工作名稱']}<br>時段：${s['開始時間']}-${s['結束時間']}</div>`, new Date(2026,0,1,sh,sm), new Date(2026,0,1,eh,em)];
+        
+        let tooltip = `<div style="padding:10px;"><b>${name}</b><br>工作：${s['工作名稱']}<br>時段：${s['開始時間']} - ${s['結束時間']}`;
+        if(s['備註']) tooltip += `<br><span style="color:blue">註解：${s['備註']}</span>`;
+        if(s['備註2']) tooltip += `<br><span style="color:teal">補充：${s['備註2']}</span>`;
+        tooltip += `</div>`;
+
+        return [name, s['工作名稱'], tooltip, new Date(2026,0,1,sh,sm), new Date(2026,0,1,eh,em)];
     });
     dataTable.addRows(rows); 
     chart.draw(dataTable, { timeline: { colorByRowLabel: true }, tooltip: { isHtml: true } });
