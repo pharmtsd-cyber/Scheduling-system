@@ -12,13 +12,12 @@
         .drop-zone.drag-over { background: rgba(59, 130, 246, 0.1); border: 2px dashed #3b82f6; }
         .timeline-block { position: absolute; top: 5px; bottom: 5px; background: #dbeafe; border: 1px solid #60a5fa; border-radius: 6px; padding: 4px; display: flex; flex-direction: column; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10; cursor: grab; overflow: hidden; transition: transform 0.1s; }
         .timeline-block:active { cursor: grabbing; transform: scale(1.02); }
-        .timeline-block select { width: 100%; border: 1px solid #bfdbfe; border-radius: 3px; padding: 1px; font-size: 10px; background: white; margin-top: 2px;}
         .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
     </style>
 </head>
 <body class="bg-slate-100 flex h-screen overflow-hidden text-slate-800 font-sans">
 
-    <!-- 左側選單 -->
+    <!-- 左側選單 (ICON 優化) -->
     <aside class="w-64 bg-slate-800 text-white flex flex-col shadow-lg z-20">
         <div class="p-4 text-lg font-bold border-b border-slate-700 flex items-center gap-2">🏥 智能排班系統</div>
         
@@ -31,16 +30,17 @@
             <button onclick="logout()" class="text-xs text-slate-400 hover:text-white underline">登出</button>
         </div>
 
-        <div class="p-3 text-sm text-slate-400 font-bold bg-slate-800">👁️ 班表總覽</div>
+        <div class="p-3 text-sm text-slate-400 font-bold bg-slate-800">📅 各單位班表總覽</div>
         <ul id="publicDeptList" class="overflow-y-auto flex-1 px-2 space-y-1"></ul>
 
         <div id="adminMenu" class="hidden flex-col border-t-2 border-slate-600 bg-slate-700 pb-4">
-            <div class="p-3 text-sm text-yellow-400 font-bold">🔒 排班管理專區</div>
+            <div class="p-3 text-sm text-yellow-400 font-bold">⚙️ 排班管理與維護</div>
             <ul id="adminDeptList" class="px-2 space-y-1 overflow-y-auto max-h-40 mb-2"></ul>
             <hr class="border-slate-600 mx-2 mb-2">
             <ul class="px-2 space-y-1">
-                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-yellow-200 text-sm font-bold" onclick="showEmployeeMaint()">👥 員工組別維護</li>
-                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-green-300 text-sm font-bold" onclick="showTaskMaint()">📋 工作項目維護</li>
+                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-pink-300 text-sm font-bold transition" onclick="openHolidayAdmin()">🌴 假日專班排班</li>
+                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-yellow-200 text-sm font-bold transition" onclick="showEmployeeMaint()">🧑‍🤝‍🧑 全院員工名冊</li>
+                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-green-300 text-sm font-bold transition" onclick="showTaskMaint()">📑 工作項目清單</li>
             </ul>
         </div>
     </aside>
@@ -48,7 +48,7 @@
     <!-- 主內容區 -->
     <main id="mainContent" class="flex-1 p-6 overflow-y-auto relative w-full">
         <!-- 狀態提示 -->
-        <div id="statusToast" class="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg hidden z-50 transition-opacity">已儲存</div>
+        <div id="statusToast" class="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg hidden z-50 transition-opacity font-bold">操作成功</div>
         
         <div id="welcomeMsg" class="flex flex-col items-center justify-center h-full text-slate-400">
             <div class="text-6xl mb-4">👋</div><div class="text-2xl font-bold">歡迎使用，請選擇部門</div>
@@ -63,26 +63,28 @@
             <div id="timeline_chart" class="bg-white p-4 shadow rounded flex-1 min-h-[400px]"></div>
         </div>
 
-        <!-- 管理員排班 -->
+        <!-- 假日班模式 (獨立頁面建置中) -->
+        <div id="holidayAdminView" class="hidden h-full flex flex-col items-center justify-center">
+            <div class="text-6xl mb-4">🌴</div>
+            <h2 class="text-3xl font-bold text-slate-600 mb-2">假日班排班模式</h2>
+            <p class="text-slate-400 font-bold">獨立排班邏輯系統建置中，敬請期待...</p>
+        </div>
+
+        <!-- 管理員排班 (平日模式) -->
         <div id="adminView" class="hidden">
             <h2 id="adminTitle" class="text-2xl font-bold mb-4 text-blue-700 border-b-2 border-blue-200 pb-2"></h2>
             
             <div class="bg-white p-4 rounded shadow mb-4 flex flex-wrap items-end gap-4 border-l-4 border-indigo-500">
                 <div><label class="block text-xs font-bold text-slate-500">預覽月份</label><input type="month" id="previewMonth" class="border p-1 rounded w-40" onchange="renderInteractiveGrid()"></div>
                 <div><label class="block text-xs font-bold text-slate-500">目標承襲月份</label><input type="month" id="targetMonth" class="border p-1 rounded w-40"></div>
-                <button onclick="copyMonthSchedule()" class="bg-indigo-600 text-white px-4 py-1 rounded shadow hover:bg-indigo-700">執行承襲套用</button>
+                <button onclick="copyMonthSchedule()" class="bg-indigo-600 text-white px-4 py-1 rounded shadow hover:bg-indigo-700 font-bold">🔄 承襲套用</button>
             </div>
 
             <div class="bg-white p-5 rounded shadow">
                 <div class="flex justify-between items-center mb-4">
                     <div class="flex items-center gap-4">
                         <input type="date" id="interactiveDate" class="border p-2 rounded shadow-sm text-lg font-bold" onchange="renderInteractiveGrid()">
-                        
-                        <!-- 雙模式切換 -->
-                        <div class="bg-slate-200 rounded p-1 flex font-bold text-sm">
-                            <button id="btnModePerson" onclick="switchMode('person')" class="px-4 py-1 rounded bg-white shadow text-blue-600">平日模式(以人為主)</button>
-                            <button id="btnModeTask" onclick="switchMode('task')" class="px-4 py-1 rounded text-slate-500 hover:text-slate-700">假日模式(以工作為主)</button>
-                        </div>
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded">平日排班模式 (以人為主)</span>
                     </div>
                     <button onclick="openShiftModal()" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-1">➕ 新增班表</button>
                 </div>
@@ -92,19 +94,19 @@
             </div>
         </div>
 
-        <!-- 維護畫面 -->
+        <!-- 其他維護畫面 -->
         <div id="employeeAdminView" class="hidden">
-            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">👥 員工組別維護</h2>
+            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">🧑‍🤝‍🧑 員工名冊維護</h2>
             <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">編號</th><th class="p-2">姓名</th><th class="p-2">組別</th><th class="p-2">操作</th></tr></thead><tbody id="empTableBody"></tbody></table></div>
         </div>
         <div id="taskAdminView" class="hidden">
-            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">📋 工作項目維護</h2>
+            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">📑 工作項目清單</h2>
             <button onclick="addTask()" class="mb-4 bg-blue-600 text-white px-4 py-2 rounded font-bold shadow">➕ 新增工作</button>
             <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">工作名稱</th><th class="p-2">預設類別</th><th class="p-2">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
         </div>
     </main>
 
-    <!-- 排班編輯 Modal -->
+    <!-- 班表編輯 Modal -->
     <div id="shiftModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
         <div class="bg-white rounded-lg shadow-xl w-96 p-6">
             <h3 class="text-xl font-bold mb-4 text-blue-700" id="modalTitle">新增/編輯班表</h3>
@@ -129,7 +131,46 @@
         </div>
     </div>
 
-    <!-- 載入模組化 JS -->
+    <!-- 員工屬性與備註快速編輯 Modal -->
+    <div id="quickEmpModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-lg shadow-xl w-[400px] p-6">
+            <h3 class="text-xl font-bold mb-4 text-teal-700 flex justify-between">
+                <span>👤 編輯人員設定</span>
+                <span id="qEmpName" class="text-slate-500"></span>
+            </h3>
+            <input type="hidden" id="qEmpId">
+            <div class="space-y-3">
+                <div class="flex gap-2">
+                    <div class="w-1/2"><label class="text-sm font-bold">所屬單位</label><input type="text" id="qDept" value="藥學部" class="w-full border p-2 rounded"></div>
+                    <div class="w-1/2"><label class="text-sm font-bold">權限</label><input type="text" id="qAuth" class="w-full border p-2 rounded"></div>
+                </div>
+                <div class="flex gap-2">
+                    <div class="w-1/2"><label class="text-sm font-bold">啟用時間</label><input type="date" id="qStart" class="w-full border p-2 rounded"></div>
+                    <div class="w-1/2"><label class="text-sm font-bold">停用時間</label><input type="date" id="qEnd" class="w-full border p-2 rounded"></div>
+                </div>
+                <div>
+                    <label class="text-sm font-bold">所屬類別</label>
+                    <select id="qCategory" class="w-full border p-2 rounded">
+                        <option value="">--選擇類別--</option><option value="部本部">部本部</option><option value="藥品調劑科">藥品調劑科</option><option value="臨床藥學科">臨床藥學科</option><option value="IRB">IRB</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm font-bold">所屬組別</label>
+                    <select id="qGroup" class="w-full border p-2 rounded">
+                        <option value="">--選擇組別--</option>
+                        <option value="門診藥局">門診藥局</option><option value="藥品調劑科">藥品調劑科</option><option value="藥學部">藥學部</option><option value="調配藥局">調配藥局</option><option value="正確用藥推廣組">正確用藥推廣組</option><option value="藥物諮詢組">藥物諮詢組</option><option value="急診藥局">急診藥局</option><option value="住院藥局">住院藥局</option><option value="智能運管組">智能運管組</option><option value="臨床藥學科">臨床藥學科</option><option value="藥品管理組">藥品管理組</option><option value="藥學教育組">藥學教育組</option><option value="作業品質控管組">作業品質控管組</option><option value="藥事照護組">藥事照護組</option><option value="臨床試驗藥局">臨床試驗藥局</option><option value="IRB">IRB</option>
+                    </select>
+                </div>
+                <!-- 我們將 空白欄位五 作為這名人員的排班備註 -->
+                <div><label class="text-sm font-bold text-red-600">班表常駐備註 (顯示於名字下方)</label><input type="text" id="qRemark" placeholder="例如：11/5-11 出院教學" class="w-full border p-2 rounded border-red-200"></div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-2">
+                <button onclick="document.getElementById('quickEmpModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600">取消</button>
+                <button onclick="saveQuickEmpEdit()" class="px-4 py-2 bg-teal-600 text-white rounded font-bold">儲存設定</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/ui.js"></script>
