@@ -28,7 +28,6 @@ function renderInteractiveGrid() {
     const date = document.getElementById('interactiveDate').value;
     const shifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === date);
     
-    // 抓取當日頂部與底部備註 (利用虛擬員工 SYS_REMARK 存取)
     const dailyRemarkShift = shifts.find(s => s['員工編號'] === 'SYS_REMARK') || {};
     const topRemark = dailyRemarkShift['備註'] || '';
     const bottomRemark = dailyRemarkShift['備註2'] || '';
@@ -40,14 +39,12 @@ function renderInteractiveGrid() {
         return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
     });
 
-    // --- 渲染頂部備註 ---
     let topRemarkHtml = `<div class="bg-yellow-50 border-b border-yellow-200 p-2 flex items-center gap-2">
         <span class="text-yellow-700 font-bold text-sm shrink-0">📢 頂部備註：</span>
         <input type="text" class="flex-1 bg-transparent border-b border-yellow-300 focus:border-yellow-600 outline-none text-sm text-yellow-800" value="${topRemark}" placeholder="輸入顯示於班表最上方的備註..." onblur="saveDailyRemark('${dailyRemarkId}', this.value, null)">
     </div>`;
     container.innerHTML += topRemarkHtml;
 
-    // --- 表頭 (4大欄位+30分刻度) ---
     let headerHtml = `<div class="flex border-b bg-slate-200 text-[11px] font-bold text-slate-600 sticky top-0 z-20">
         <div class="w-24 p-2 border-r text-center shrink-0 flex items-center justify-center bg-slate-200">人員名單</div>
         <div class="w-32 p-2 border-r text-center shrink-0 flex items-center justify-center text-blue-700 bg-blue-50">個人備註</div>
@@ -60,7 +57,6 @@ function renderInteractiveGrid() {
     </div>`;
     container.innerHTML += headerHtml;
 
-    // --- 員工行 ---
     deptStaff.forEach(emp => {
         const myShifts = shifts.filter(s => s['員工編號'] == emp['員工編號']);
         let mainShift = myShifts.length > 0 ? myShifts[0] : null;
@@ -106,7 +102,6 @@ function renderInteractiveGrid() {
         container.innerHTML += rowHtml;
     });
 
-    // --- 渲染底部備註 ---
     let bottomRemarkHtml = `<div class="bg-yellow-50 border-t border-yellow-200 p-2 flex items-center gap-2 mt-2">
         <span class="text-yellow-700 font-bold text-sm shrink-0">📢 底部備註：</span>
         <input type="text" class="flex-1 bg-transparent border-b border-yellow-300 focus:border-yellow-600 outline-none text-sm text-yellow-800" value="${bottomRemark}" placeholder="輸入顯示於班表最下方的備註..." onblur="saveDailyRemark('${dailyRemarkId}', null, this.value)">
@@ -114,7 +109,6 @@ function renderInteractiveGrid() {
     container.innerHTML += bottomRemarkHtml;
 }
 
-// 儲存全局/上下備註
 async function saveDailyRemark(shiftId, topVal, bottomVal) {
     const date = document.getElementById('interactiveDate').value;
     const existing = appData.shifts.find(s => s['排班ID'] === shiftId) || {};
@@ -140,7 +134,6 @@ async function updateShiftRemarks(shiftId, r1, r2) {
     }
 }
 
-// 拖曳、複製與編輯 Modal (維持原邏輯，略過重複代碼)
 function copyShift(shiftId) { clipboardShift = appData.shifts.find(s => s['排班ID'] === shiftId); showToast("✅ 已複製"); renderInteractiveGrid(); }
 function pasteShift(empId) {
     if (!clipboardShift) return; openShiftModal(); 
@@ -164,6 +157,7 @@ async function dropShift(ev, newEmpId) {
         await postAction({ action: 'save_shift', shiftId: shift['排班ID'], date: shift['日期'], dept: shift['部門名稱'], empId: shift['員工編號'], task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] });
     }
 }
+
 function openShiftModal(shiftId = null) {
     const modal = document.getElementById('shiftModal');
     document.getElementById('modalEmp').innerHTML = appData.staff.filter(s => s['所屬組別'] === currentDept).map(e => `<option value="${e['員工編號']}">${e['姓名']}</option>`).join('');
@@ -186,35 +180,56 @@ async function copyMonthSchedule() {
     if(sourceMonth && targetMonth && confirm(`承襲 ${sourceMonth} 至 ${targetMonth}？`)) { await postAction({ action: 'copy_month_template', sourceMonth, targetMonth, deptName: currentDept }); }
 }
 
-// 修正：員工日期格式解析
-function formatDateForInput(dateStr) {
-    if(!dateStr) return '';
-    try {
-        const d = new Date(dateStr);
-        if(isNaN(d.getTime())) return '';
-        const yyyy = d.getFullYear(); const mm = String(d.getMonth()+1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
-    } catch(e) { return ''; }
-}
-
+// === 修改：人員編輯的時間格式與預設唯讀 ===
 function openQuickEmpEdit(empId) {
     const emp = appData.staff.find(e => e['員工編號'] === empId);
     if(!emp) return;
+    
     document.getElementById('qEmpId').value = empId;
     document.getElementById('qEmpName').innerText = emp['姓名'];
     document.getElementById('qDept').value = emp['所屬單位'] || '藥學部';
     document.getElementById('qAuth').value = emp['權限'] || '';
     
-    document.getElementById('qStart').value = formatDateForInput(emp['啟用時間']);
-    document.getElementById('qEnd').value = formatDateForInput(emp['停用時間']);
+    // 啟用時間改為純文字 (唯讀)
+    document.getElementById('qStartDisplay').innerText = emp['啟用時間'] || '無紀錄';
+    document.getElementById('qStart').value = emp['啟用時間'] || '';
+    
+    // 停用時間改為 datetime-local 以支援時分秒 (YYYY-MM-DDTHH:mm:ss)
+    let endStr = emp['停用時間'] || '';
+    if(endStr && !endStr.includes('T')) endStr = endStr.replace(' ', 'T'); // 轉換 GS 格式
+    document.getElementById('qEnd').value = endStr;
     
     document.getElementById('qCategory').value = emp['所屬類別'] || '';
     document.getElementById('qGroup').value = emp['所屬組別'] || '';
     document.getElementById('quickEmpModal').classList.remove('hidden');
 }
 
+// 當選擇離職時，自動填入現在台灣時間 (YYYY-MM-DDTHH:mm:ss)
+function handleDeptChange(val) {
+    if(val === '離職') {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth()+1).padStart(2,'0');
+        const dd = String(now.getDate()).padStart(2,'0');
+        const hh = String(now.getHours()).padStart(2,'0');
+        const min = String(now.getMinutes()).padStart(2,'0');
+        const ss = String(now.getSeconds()).padStart(2,'0');
+        document.getElementById('qEnd').value = `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
+    }
+}
+
 async function saveQuickEmpEdit() {
-    const updateData = { '所屬單位': document.getElementById('qDept').value, '權限': document.getElementById('qAuth').value, '啟用時間': document.getElementById('qStart').value, '停用時間': document.getElementById('qEnd').value, '所屬類別': document.getElementById('qCategory').value, '所屬組別': document.getElementById('qGroup').value };
+    let endVal = document.getElementById('qEnd').value;
+    if(endVal) endVal = endVal.replace('T', ' '); // 存回資料庫時換回空格分隔
+    
+    const updateData = { 
+        '所屬單位': document.getElementById('qDept').value, 
+        '權限': document.getElementById('qAuth').value, 
+        // 啟用時間不更新，維持原樣
+        '停用時間': endVal, 
+        '所屬類別': document.getElementById('qCategory').value, 
+        '所屬組別': document.getElementById('qGroup').value 
+    };
     document.getElementById('quickEmpModal').classList.add('hidden');
     await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData });
 }
