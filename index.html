@@ -4,78 +4,84 @@
     <meta charset="UTF-8">
     <title>醫院排班系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 用於一般檢視的圖表 -->
     <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <style>
+        /* 視覺化排班區塊的 CSS */
+        .timeline-container { position: relative; height: 60px; background: #f1f5f9; border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
+        .timeline-block { position: absolute; top: 0; bottom: 0; background: #bfdbfe; border: 1px solid #60a5fa; border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .timeline-block select, .timeline-block input { width: 100%; border: 1px solid #93c5fd; border-radius: 4px; padding: 2px; }
+    </style>
 </head>
-<body class="bg-gray-100 flex h-screen overflow-hidden">
+<body class="bg-gray-100 flex h-screen overflow-hidden text-slate-800">
 
-    <!-- 左側選單：部門清單 -->
+    <!-- 左側選單 -->
     <aside class="w-64 bg-slate-800 text-white flex flex-col">
-        <div class="p-4 text-xl font-bold border-b border-slate-700">排班系統</div>
-        <ul id="deptList" class="flex-1 overflow-y-auto p-2">
-            <!-- 透過 sidebar.js 動態載入部門 -->
-        </ul>
-        <div class="p-4 border-t border-slate-700">
-            <button onclick="addDepartment()" class="w-full bg-blue-600 py-2 rounded hover:bg-blue-500">+ 新增部門</button>
+        <div class="p-4 text-xl font-bold border-b border-slate-700">🏥 排班系統</div>
+        
+        <!-- 登入區 -->
+        <div id="loginArea" class="p-4 border-b border-slate-700">
+            <input type="text" id="loginId" placeholder="輸入員工編號登入" class="w-full text-black p-1 rounded mb-2 text-sm">
+            <button onclick="login()" class="w-full bg-blue-600 rounded py-1 text-sm">登入/驗證權限</button>
+        </div>
+        <div id="userInfo" class="p-4 border-b border-slate-700 text-green-400 hidden text-sm font-bold"></div>
+
+        <div class="p-2 text-sm text-slate-400 mt-2">一般檢視 (各部門)</div>
+        <ul id="publicDeptList" class="overflow-y-auto px-2"></ul>
+
+        <!-- 排班專區 (有權限才顯示) -->
+        <div id="adminMenu" class="hidden">
+            <div class="p-2 text-sm text-yellow-400 mt-4 border-t border-slate-700 pt-4">🔒 排班管理專區</div>
+            <ul id="adminDeptList" class="px-2"></ul>
+            <ul class="px-2 mt-2">
+                <li class="cursor-pointer p-2 hover:bg-slate-700 rounded text-yellow-200" onclick="showEmployeeMaint()">👥 員工清單維護</li>
+            </ul>
         </div>
     </aside>
 
-    <!-- 右側主要內容 -->
-    <main id="mainContent" class="flex-1 p-6 overflow-y-auto hidden">
-        <div class="flex justify-between items-center mb-6">
-            <h2 id="currentDeptTitle" class="text-3xl font-bold text-slate-800"></h2>
-            <div class="flex gap-2">
-                <input type="month" id="targetMonth" class="border p-2 rounded">
-                <button onclick="copyLastMonth()" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">🔄 承襲上個月班表</button>
-            </div>
+    <!-- 右側主內容 -->
+    <main id="mainContent" class="flex-1 p-6 overflow-y-auto relative">
+        <div id="welcomeMsg" class="text-center text-slate-500 mt-20 text-2xl">請自左側選擇部門或登入</div>
+        
+        <!-- 公開檢視畫面 (Google Charts) -->
+        <div id="publicView" class="hidden">
+            <h2 id="publicTitle" class="text-2xl font-bold mb-4"></h2>
+            <input type="date" id="publicDate" class="border p-2 rounded mb-4" onchange="renderPublicChart()">
+            <div id="timeline_chart" style="height: 500px; width: 100%;" class="bg-white p-4 shadow rounded"></div>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <!-- 直接安排工作區塊 -->
-            <div class="xl:col-span-1 bg-white p-4 rounded shadow">
-                <h3 class="font-bold text-lg mb-4">排班面板 (新增/修改)</h3>
-                <form id="shiftForm" class="flex flex-col gap-3">
-                    <input type="date" id="formDate" required class="border p-2 rounded">
-                    <select id="formEmp" required class="border p-2 rounded"></select>
-                    <select id="formTask" required class="border p-2 rounded"></select>
-                    <div class="flex gap-2">
-                        <input type="time" id="formStart" required class="border p-2 rounded w-1/2">
-                        <input type="time" id="formEnd" required class="border p-2 rounded w-1/2">
-                    </div>
-                    <select id="formCategory" class="border p-2 rounded">
-                        <option value="常規">常規</option>
-                        <option value="特別備註">特別備註</option>
-                    </select>
-                    <input type="text" id="formRemark" placeholder="備註說明..." class="border p-2 rounded">
-                    <button type="button" onclick="saveShift()" class="bg-green-600 text-white font-bold py-2 rounded">儲存排班</button>
-                </form>
+        <!-- 管理員排班畫面 (可承襲、可互動編輯) -->
+        <div id="adminView" class="hidden">
+            <h2 id="adminTitle" class="text-2xl font-bold mb-4 text-blue-700"></h2>
+            
+            <div class="bg-white p-4 rounded shadow mb-6 flex items-end gap-4 border-l-4 border-blue-500">
+                <div>
+                    <label class="block text-sm font-bold text-slate-600">步驟1：選擇瀏覽月份</label>
+                    <input type="month" id="previewMonth" class="border p-2 rounded" onchange="renderInteractiveGrid()">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-600">步驟2：承襲至目標月份</label>
+                    <input type="month" id="targetMonth" class="border p-2 rounded">
+                </div>
+                <button onclick="copyMonthSchedule()" class="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700">執行承襲套用</button>
             </div>
 
-            <!-- 瀏覽圖與甘特圖區塊 -->
-            <div class="xl:col-span-2 bg-white p-4 rounded shadow">
-                <div class="flex justify-between mb-4">
-                    <h3 class="font-bold text-lg">即時排班總覽</h3>
-                    <input type="date" id="ganttDate" onchange="renderGantt()" class="border p-1 rounded">
+            <!-- 自訂圖像化排班區塊 (內嵌選單) -->
+            <div class="bg-white p-4 rounded shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-lg">每日互動排班圖</h3>
+                    <input type="date" id="interactiveDate" class="border p-2 rounded" onchange="renderInteractiveGrid()">
                 </div>
-                <!-- 點擊圖表空白處也可直接跳出新增視窗，透過 gantt.js 實作 -->
-                <div id="timeline_chart" style="height: 400px; width: 100%;"></div>
+                <!-- 網格容器 -->
+                <div id="interactiveGrid" class="w-full border-t border-slate-200 pt-4"></div>
             </div>
         </div>
     </main>
 
-    <!-- 模組化 JS 引入 -->
     <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
     <script src="js/sidebar.js"></script>
-    <script src="js/department.js"></script>
-    <script src="js/schedule.js"></script>
-    <script src="js/gantt.js"></script>
-    
-    <script>
-        // 系統進入點
-        google.charts.load('current', {'packages':['timeline']});
-        google.charts.setOnLoadCallback(async () => {
-            await fetchAllData();
-            renderSidebar();
-        });
-    </script>
+    <script src="js/scheduleAdmin.js"></script>
+    <script src="js/publicView.js"></script>
 </body>
 </html>
