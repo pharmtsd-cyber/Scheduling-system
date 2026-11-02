@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>住院藥局智能排班系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <style>
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; font-weight: bold; }
+        .hidden-section { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+
+    <!-- 頂部導覽列 -->
+    <nav class="bg-white shadow-md p-4 flex justify-between items-center">
+        <div class="text-xl font-bold text-blue-700">🏥 住院藥局排班系統</div>
+        <div id="userInfo" class="text-sm font-medium text-slate-600">尚未登入</div>
+    </nav>
+
+    <!-- 登入頁面 -->
+    <div id="loginSection" class="max-w-md mx-auto mt-20 bg-white p-8 rounded-lg shadow-lg">
+        <h2 class="text-2xl font-bold mb-6 text-center text-slate-700">員工登入</h2>
+        <div class="mb-4">
+            <label class="block text-sm font-bold mb-2">請輸入員工編號</label>
+            <input type="text" id="empIdInput" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如：001">
+        </div>
+        <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition">登入系統</button>
+        <p id="loginError" class="text-red-500 text-sm mt-2 hidden">查無此員工或無權限</p>
+    </div>
+
+    <!-- 系統主畫面 (登入後顯示) -->
+    <div id="mainSection" class="hidden-section max-w-7xl mx-auto mt-6">
+        <!-- 頁籤切換 -->
+        <div class="flex border-b mb-6 bg-white shadow-sm rounded-t-lg px-4 pt-2">
+            <button onclick="switchTab('scheduleTab')" id="btn-scheduleTab" class="px-6 py-3 tab-active">安排排班</button>
+            <button onclick="switchTab('viewTab')" id="btn-viewTab" class="px-6 py-3 text-slate-500">排班總覽 (甘特圖)</button>
+        </div>
+
+        <!-- 安排排班區塊 -->
+        <div id="scheduleTab" class="bg-white p-6 rounded-b-lg shadow-sm">
+            <h3 class="text-lg font-bold mb-4 border-l-4 border-blue-500 pl-2">新增工作安排</h3>
+            <form id="shiftForm" class="grid grid-cols-1 md:grid-cols-2 gap-4" onsubmit="event.preventDefault(); submitShift();">
+                
+                <div>
+                    <label class="block text-sm font-bold mb-1">日期</label>
+                    <input type="date" id="formDate" required class="w-full px-3 py-2 border rounded-md">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold mb-1">安排人員</label>
+                    <select id="formEmp" required class="w-full px-3 py-2 border rounded-md">
+                        <option value="">請選擇人員...</option>
+                        <!-- 人員清單由 JS 動態載入 -->
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold mb-1">工作內容</label>
+                    <select id="formTask" required class="w-full px-3 py-2 border rounded-md">
+                        <option value="">請選擇工作...</option>
+                        <!-- 工作清單由 JS 動態載入 -->
+                    </select>
+                </div>
+
+                <div class="flex gap-2">
+                    <div class="w-1/2">
+                        <label class="block text-sm font-bold mb-1">開始時間</label>
+                        <input type="time" id="formStart" required class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-sm font-bold mb-1">結束時間</label>
+                        <input type="time" id="formEnd" required class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold mb-1">工作類別 (用於備註標示)</label>
+                    <select id="formCategory" class="w-full px-3 py-2 border rounded-md">
+                        <option value="常規">常規作業</option>
+                        <option value="特別備註">特別備註 (如：會議、盤點、教學)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold mb-1">備註說明</label>
+                    <input type="text" id="formRemark" class="w-full px-3 py-2 border rounded-md" placeholder="例如：W5點紅桶數量">
+                </div>
+
+                <div class="md:col-span-2 mt-4 text-right">
+                    <button type="submit" class="bg-green-600 text-white font-bold py-2 px-6 rounded-md hover:bg-green-700">儲存排班</button>
+                    <span id="saveStatus" class="ml-3 text-sm text-green-600 hidden">儲存成功！</span>
+                </div>
+            </form>
+        </div>
+
+        <!-- 排班總覽 (甘特圖) 區塊 -->
+        <div id="viewTab" class="hidden-section bg-white p-6 rounded-b-lg shadow-sm">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 class="text-lg font-bold border-l-4 border-indigo-500 pl-2">即時排班總覽</h3>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-bold">選擇檢視日期：</label>
+                    <input type="date" id="viewDate" class="px-3 py-1 border rounded-md" onchange="renderChart()">
+                </div>
+            </div>
+            <!-- Google Charts 容器 -->
+            <div id="timeline_chart" style="height: 500px; width: 100%;"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. 系統設定與全域變數
+        // ==========================================
+        // 請將此處替換為您 GAS 部署後獲得的 Web App URL
+        const GAS_URL = '請貼上您的_GAS_WEB_APP_URL'; 
+        
+        let currentUser = null;
+        
+        // 假資料 fallback (當尚未串接 GAS 時可供測試)
+        let staffData = [
+            { "員工編號": "001", "姓名": "陳宛君" },
+            { "員工編號": "002", "姓名": "陳尹晨" },
+            { "員工編號": "003", "姓名": "蔡達達" }
+        ];
+        let taskData = [
+            { "工作名稱": "住院藥局作業管控" },
+            { "工作名稱": "線上調劑" },
+            { "工作名稱": "兒科分包" },
+            { "工作名稱": "簽收全線" }
+        ];
+        let shiftData = [
+            // 預設測試資料，對應文件中的 8:00-12:00 等時段
+            ["2026-11-02", "002", "線上調劑", "08:00", "12:00", "常規", "支援"],
+            ["2026-11-02", "003", "兒科分包", "09:00", "11:30", "特別備註", "教學"]
+        ];
+
+        // 載入 Google Charts Timeline 套件
+        google.charts.load('current', {'packages':['timeline']});
+        google.charts.setOnLoadCallback(initApp);
+
+        // ==========================================
+        // 2. 初始化與登入邏輯
+        // ==========================================
+        function initApp() {
+            // 系統初始化時，預設帶入今日日期
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('formDate').value = today;
+            document.getElementById('viewDate').value = today;
+            
+            // 若有 GAS URL 則從後端抓取真實資料
+            if(GAS_URL !== '請貼上您的_GAS_WEB_APP_URL') {
+                fetchRealData();
+            } else {
+                populateDropdowns(); // 用測試資料填充電選單
+            }
+        }
+
+        async function fetchRealData() {
+            try {
+                // 平行抓取員工與工作清單
+                const [staffRes, taskRes, shiftRes] = await Promise.all([
+                    fetch(`${GAS_URL}?sheet=員工清單`).then(r => r.json()),
+                    fetch(`${GAS_URL}?sheet=工作清單`).then(r => r.json()),
+                    fetch(`${GAS_URL}?sheet=排班紀錄`).then(r => r.json())
+                ]);
+                if(staffRes.status === "success") staffData = staffRes.data;
+                if(taskRes.status === "success") taskData = taskRes.data;
+                if(shiftRes.status === "success") {
+                    // 將物件陣列轉回一般陣列以符合甘特圖邏輯
+                    shiftData = shiftRes.data.map(d => [d['日期'], d['員工編號'], d['工作名稱'], d['開始時間'], d['結束時間'], d['工作類別'], d['備註']]);
+                }
+                populateDropdowns();
+            } catch (err) {
+                console.error("載入資料失敗", err);
+            }
+        }
+
+        function populateDropdowns() {
+            const empSelect = document.getElementById('formEmp');
+            const taskSelect = document.getElementById('formTask');
+            
+            empSelect.innerHTML = '<option value="">請選擇人員...</option>';
+            staffData.forEach(emp => {
+                empSelect.innerHTML += `<option value="${emp['員工編號']}">${emp['姓名']} (${emp['員工編號']})</option>`;
+            });
+
+            taskSelect.innerHTML = '<option value="">請選擇工作...</option>';
+            taskData.forEach(task => {
+                taskSelect.innerHTML += `<option value="${task['工作名稱']}">${task['工作名稱']}</option>`;
+            });
+        }
+
+        function login() {
+            const inputId = document.getElementById('empIdInput').value.trim();
+            const user = staffData.find(e => e['員工編號'] === inputId);
+            
+            if (user) {
+                currentUser = user;
+                document.getElementById('userInfo').innerText = `目前登入：${user['姓名']}`;
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('mainSection').classList.remove('hidden-section');
+                document.getElementById('loginError').classList.add('hidden');
+                renderChart();
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        }
+
+        // ==========================================
+        // 3. UI 互動與 API 寫入
+        // ==========================================
+        function switchTab(tabId) {
+            document.getElementById('scheduleTab').classList.add('hidden-section');
+            document.getElementById('viewTab').classList.add('hidden-section');
+            document.getElementById('btn-scheduleTab').classList.remove('tab-active', 'text-slate-500');
+            document.getElementById('btn-viewTab').classList.remove('tab-active', 'text-slate-500');
+            
+            if(tabId === 'scheduleTab') {
+                document.getElementById('scheduleTab').classList.remove('hidden-section');
+                document.getElementById('btn-scheduleTab').classList.add('tab-active');
+                document.getElementById('btn-viewTab').classList.add('text-slate-500');
+            } else {
+                document.getElementById('viewTab').classList.remove('hidden-section');
+                document.getElementById('btn-viewTab').classList.add('tab-active');
+                document.getElementById('btn-scheduleTab').classList.add('text-slate-500');
+                renderChart(); // 切換到總覽時重新繪製圖表
+            }
+        }
+
+        async function submitShift() {
+            const formDate = document.getElementById('formDate').value;
+            const empId = document.getElementById('formEmp').value;
+            const task = document.getElementById('formTask').value;
+            const start = document.getElementById('formStart').value;
+            const end = document.getElementById('formEnd').value;
+            const category = document.getElementById('formCategory').value;
+            const remark = document.getElementById('formRemark').value;
+
+            const newShift = [formDate, empId, task, start, end, category, remark];
+            
+            // 更新本機端狀態以供即時瀏覽
+            shiftData.push(newShift);
+
+            // 若有串接 GAS，發送 POST 請求
+            if(GAS_URL !== '請貼上您的_GAS_WEB_APP_URL') {
+                try {
+                    await fetch(GAS_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'saveShift', data: newShift })
+                    });
+                } catch(e) {
+                    console.error('上傳失敗', e);
+                }
+            }
+
+            // 顯示成功訊息並清空時間區段
+            const status = document.getElementById('saveStatus');
+            status.classList.remove('hidden');
+            setTimeout(() => status.classList.add('hidden'), 3000);
+            
+            document.getElementById('formStart').value = '';
+            document.getElementById('formEnd').value = '';
+            document.getElementById('formRemark').value = '';
+        }
+
+        // ==========================================
+        // 4. Google Charts 甘特圖渲染 (時間橫軸長條圖)
+        // ==========================================
+        function renderChart() {
+            const container = document.getElementById('timeline_chart');
+            const chart = new google.visualization.Timeline(container);
+            const dataTable = new google.visualization.DataTable();
+
+            dataTable.addColumn({ type: 'string', id: '人員' });
+            dataTable.addColumn({ type: 'string', id: '工作名稱' });
+            dataTable.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+            dataTable.addColumn({ type: 'date', id: '開始時間' });
+            dataTable.addColumn({ type: 'date', id: '結束時間' });
+
+            const targetDate = document.getElementById('viewDate').value; // 'YYYY-MM-DD'
+            
+            // 過濾出選擇日期的排班資料
+            const dayShifts = shiftData.filter(d => d[0] === targetDate);
+            
+            if (dayShifts.length === 0) {
+                container.innerHTML = `<div class="flex items-center justify-center h-full text-slate-500">該日期目前尚無排班資料。</div>`;
+                return;
+            }
+
+            const rows = [];
+            dayShifts.forEach(shift => {
+                // 解析時間 (例如 '08:00' 轉為 Date 物件，年月日使用固定數值確保橫軸純看當日時間)
+                const startParts = shift[3].split(':');
+                const endParts = shift[4].split(':');
+                const startDate = new Date(2026, 0, 1, parseInt(startParts[0]), parseInt(startParts[1]), 0);
+                const endDate = new Date(2026, 0, 1, parseInt(endParts[0]), parseInt(endParts[1]), 0);
+                
+                // 找出員工姓名
+                const empInfo = staffData.find(e => e['員工編號'] === shift[1]);
+                const empName = empInfo ? empInfo['姓名'] : shift[1];
+
+                // 自訂 tooltip 內容 (顯示類別與備註)
+                const tooltipHtml = `
+                    <div style="padding:10px; font-family:sans-serif; width: 200px;">
+                        <b>人員：</b>${empName}<br>
+                        <b>工作：</b>${shift[2]}<br>
+                        <b>時段：</b>${shift[3]} - ${shift[4]}<br>
+                        <b>類別：</b><span style="color:${shift[5] === '特別備註' ? 'red' : 'green'}">${shift[5]}</span><br>
+                        <b>備註：</b>${shift[6] || '無'}
+                    </div>
+                `;
+
+                rows.push([ empName, shift[2], tooltipHtml, startDate, endDate ]);
+            });
+
+            dataTable.addRows(rows);
+
+            // 時間軸外觀設定
+            const options = {
+                timeline: { 
+                    colorByRowLabel: true,
+                    rowLabelStyle: { fontName: 'sans-serif', fontSize: 14, color: '#334155' },
+                    barLabelStyle: { fontName: 'sans-serif', fontSize: 12 }
+                },
+                tooltip: { isHtml: true },
+                hAxis: {
+                    format: 'HH:mm',
+                    minValue: new Date(2026, 0, 1, 8, 0, 0),  // 設定橫軸起始為 08:00
+                    maxValue: new Date(2026, 0, 1, 22, 0, 0)  // 設定橫軸結束為 22:00
+                }
+            };
+
+            chart.draw(dataTable, options);
+        }
+    </script>
+</body>
+</html>
