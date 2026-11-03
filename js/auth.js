@@ -8,6 +8,12 @@ function login() {
         document.getElementById('userInfo').classList.remove('hidden');
         document.getElementById('userNameDisplay').innerText = user['姓名'];
         
+        // ★ 發送紀錄登入次數 API
+        fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'record_login' }) })
+            .then(r => r.json())
+            .then(res => { if(res.status === 'success') document.getElementById('sysViewCount').innerText = res.count; })
+            .catch(e => console.error(e));
+            
         const auth = appData.auths.find(a => a['員工編號'] == id);
         if(auth && auth['可排班部門']) {
             allowedDepts = auth['可排班部門'].split(',');
