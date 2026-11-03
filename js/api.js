@@ -95,12 +95,18 @@ function markDraft(shiftData) {
     }
 }
 
-async function publishDrafts() {
+// ==========================================
+// 草稿暫存與發佈版本機制 (Draft & Publish)
+// ==========================================
+
+// ... (上方的 markDraft 保持不變) ...
+
+// 1. 單純將草稿寫入資料庫 (不產生版本)
+async function saveDraftsToCloud() {
     if(!hasUnsavedChanges) return;
     
     const shiftsToSave = Object.values(draftShifts);
     
-    // 1. 批次儲存所有的草稿班表
     if(shiftsToSave.length > 0) {
         document.body.style.cursor = 'wait';
         await fetch(GAS_URL, { 
@@ -109,7 +115,24 @@ async function publishDrafts() {
         });
     }
 
-    // 2. 準備發佈版本紀錄
+    draftShifts = {};
+    hasUnsavedChanges = false;
+    
+    if (document.getElementById('draftStatus')) {
+        document.getElementById('draftStatus').classList.add('hidden');
+    }
+    
+    if (typeof showToast === 'function') showToast('💾 排班進度已暫存至雲端');
+    document.body.style.cursor = 'default';
+}
+
+// 2. 正式發佈歷史版本 (Snapshot)
+async function publishVersion() {
+    // 如果有尚未暫存的進度，先自動幫他存檔
+    if(hasUnsavedChanges) {
+        await saveDraftsToCloud();
+    }
+
     // 判斷目前使用者是在平日排班還是假日排班畫面，抓出當前月份
     let monthToPublish = '無';
     if (document.getElementById('interactiveDate') && !document.getElementById('adminView').classList.contains('hidden')) {
@@ -118,13 +141,17 @@ async function publishDrafts() {
         monthToPublish = document.getElementById('holidayMonth').value;
     }
 
-    const note = prompt(`(選填) 請輸入發佈備註：\n(例如：新增門診支援、修訂請假、確認定稿)`, '');
+    if (monthToPublish === '無') return alert('請先進入排班管理畫面，再進行發佈！');
+
+    const note = prompt(`(選填) 請輸入版本發佈備註：\n(例如：新增門診支援、第一版草案、確認定稿)`, '');
+    if (note === null) return; // 使用者按了取消
+
+    document.body.style.cursor = 'wait';
     
-    // 產生快照 (Snapshot)：過濾出目前 appData 內，屬於該部門且為該月份的所有班表狀態
+    // 產生快照 (Snapshot)
     const snapshotShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthToPublish));
     const snapshotJsonStr = JSON.stringify(snapshotShifts);
 
-    // 3. 發送版本快照紀錄
     await fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({ 
@@ -138,29 +165,14 @@ async function publishDrafts() {
         })
     });
 
-    // 4. 重置草稿狀態並重新載入最新資料
-    draftShifts = {};
-    hasUnsavedChanges = false;
-    
-    if (document.getElementById('draftStatus')) {
-        document.getElementById('draftStatus').classList.add('hidden');
-    }
-    
-    if (typeof showToast === 'function') showToast('💾 班表已成功儲存並發佈為新版本');
-    
+    if (typeof showToast === 'function') showToast('🚀 班表已成功發佈為新版本！');
     document.body.style.cursor = 'default';
-    await reloadData();
     
-    // 5. 依據停留的頁面重繪網格
-    if(currentDept) {
-        if (document.getElementById('adminView') && !document.getElementById('adminView').classList.contains('hidden')) {
-            if (typeof renderInteractiveGrid === 'function') renderInteractiveGrid();
-        }
-        if (document.getElementById('holidayAdminView') && !document.getElementById('holidayAdminView').classList.contains('hidden')) {
-            if (typeof renderHolidayGrid === 'function') renderHolidayGrid();
-        }
-    }
+    // 重新載入最新資料 (包含新的發佈紀錄)
+    await reloadData();
 }
+
+// ... (下方的 window.addEventListener('beforeunload' 保持不變) ...
 
 // 離站前提示防護：若有未發佈的草稿，嘗試關閉分頁或重整時會發出警告
 window.addEventListener('beforeunload', function (e) {
