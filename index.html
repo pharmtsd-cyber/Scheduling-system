@@ -43,9 +43,15 @@
         <div class="text-xs text-slate-500 font-bold flex items-center gap-2">
             👁️ 系統總登入人次：<span id="sysViewCount" class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">0</span>
         </div>
-        <div id="draftStatus" class="hidden flex items-center gap-3">
-            <span class="text-red-500 text-sm font-bold animate-pulse">⚠️ 尚有變更未發佈</span>
-            <button onclick="publishDrafts()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded text-sm font-bold shadow transition">💾 儲存並發佈</button>
+        
+        <div class="flex items-center gap-4">
+            <!-- 暫存進度區塊 (當有異動時顯示) -->
+            <div id="draftStatus" class="hidden flex items-center gap-2">
+                <span class="text-red-500 text-sm font-bold animate-pulse mr-2">⚠️ 尚有變更未儲存</span>
+                <button onclick="saveDraftsToCloud()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded text-sm font-bold shadow transition">💾 暫存進度</button>
+            </div>
+            <!-- 獨立的發佈版本按鈕 (常駐) -->
+            <button onclick="publishVersion()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 rounded text-sm font-bold shadow transition border border-blue-700">🚀 發佈新版本</button>
         </div>
     </div>
 
