@@ -369,3 +369,118 @@ async function saveQuickEmpEdit() {
         if(typeof renderEmployeeList === 'function') renderEmployeeList();
     }
 }
+
+// ==========================================
+// 🔄 進階批次承襲工具列 (單日多選 / 單週 / 整月)
+// ==========================================
+let targetDaysList = [];
+
+function toggleCopyMode() {
+    const mode = document.querySelector('input[name="copyMode"]:checked').value;
+    document.getElementById('copyModeDay').classList.add('hidden');
+    document.getElementById('copyModeWeek').classList.add('hidden');
+    document.getElementById('copyModeMonth').classList.add('hidden');
+    
+    if (mode === 'day') document.getElementById('copyModeDay').classList.remove('hidden');
+    if (mode === 'week') document.getElementById('copyModeWeek').classList.remove('hidden');
+    if (mode === 'month') document.getElementById('copyModeMonth').classList.remove('hidden');
+}
+
+// -- 單日多選邏輯 --
+function addTargetDay() {
+    const dateInput = document.getElementById('copyTargetDayInput').value;
+    if (!dateInput) return alert('請先選擇目標日期');
+    if (targetDaysList.includes(dateInput)) return alert('日期已在清單中');
+    
+    targetDaysList.push(dateInput);
+    targetDaysList.sort(); 
+    renderTargetDays();
+}
+
+function removeTargetDay(dateStr) {
+    targetDaysList = targetDaysList.filter(d => d !== dateStr);
+    renderTargetDays();
+}
+
+function renderTargetDays() {
+    const container = document.getElementById('targetDaysContainer');
+    if (targetDaysList.length === 0) {
+        container.innerHTML = '<span class="text-xs text-slate-400">尚未加入目標日期...</span>';
+        return;
+    }
+    container.innerHTML = targetDaysList.map(date => 
+        `<span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded flex items-center gap-1 border border-indigo-200 shadow-sm font-mono">
+            ${date} <button onclick="removeTargetDay('${date}')" class="text-red-500 hover:text-red-700 font-bold text-sm leading-none">×</button>
+        </span>`
+    ).join('');
+}
+
+function executeCopyDay() {
+    const sourceDate = document.getElementById('copySourceDay').value;
+    if (!sourceDate) return alert('請選擇來源日期');
+    if (targetDaysList.length === 0) return alert('請加入至少一個目標日期');
+    
+    // 排除系統備註，只複製實體人員的班
+    const sourceShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === sourceDate && s['員工編號'] !== 'SYS_REMARK');
+    if (sourceShifts.length === 0) return alert(`來源日期 ${sourceDate} 無任何排班資料。`);
+    
+    if (!confirm(`將 ${sourceDate} 的 ${sourceShifts.length} 筆班表，\n複製到所選的 ${targetDaysList.length} 天中，確定嗎？\n(將自動轉為草稿，需手動儲存)`)) return;
+    
+    targetDaysList.forEach(tDate => {
+        sourceShifts.forEach(shift => {
+            markDraft({
+                shiftId: 'C' + new Date().getTime() + Math.random().toString(36).substr(2, 5),
+                date: tDate, dept: shift['部門名稱'], empId: shift['員工編號'], task: shift['工作名稱'], 
+                start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], 
+                remark1: shift['備註'], remark2: shift['備註2']
+            });
+        });
+    });
+    
+    showToast(`✅ 單日承襲成功，產生了 ${sourceShifts.length * targetDaysList.length} 筆草稿。`);
+    document.getElementById('interactiveDate').value = targetDaysList[0]; // 自動跳到第一個目標日方便檢視
+    targetDaysList = [];
+    renderTargetDays();
+    renderInteractiveGrid();
+}
+
+// -- 單週承襲邏輯 --
+function executeCopyWeek() {
+    const sourceWeek = document.getElementById('copySourceWeek').value;
+    const targetWeek = document.getElementById('copyTargetWeek').value;
+    
+    if (!sourceWeek || !targetWeek) return alert('請選擇來源週與目標週的起始日');
+    
+    let sDate = new Date(sourceWeek);
+    let tDate = new Date(targetWeek);
+    
+    if (sDate.getDay() !== tDate.getDay()) {
+        if (!confirm(`⚠️ 警告：來源與目標的起始「星期幾」不同！\n(${sDate.getDay()} vs ${tDate.getDay()})\n系統將會無視星期差異，強制向後複製 7 天，確定嗎？`)) return;
+    } else {
+        if (!confirm(`即將把自 ${sourceWeek} 起 7 天的班表，\n依序對齊複製到 ${targetWeek} 起 7 天，確定嗎？\n(將自動轉為草稿，需手動儲存)`)) return;
+    }
+    
+    let totalCopied = 0;
+    for (let i = 0; i < 7; i++) {
+        let currS = new Date(sDate); currS.setDate(currS.getDate() + i);
+        let currT = new Date(tDate); currT.setDate(currT.getDate() + i);
+        
+        let sStr = `${currS.getFullYear()}-${String(currS.getMonth()+1).padStart(2,'0')}-${String(currS.getDate()).padStart(2,'0')}`;
+        let tStr = `${currT.getFullYear()}-${String(currT.getMonth()+1).padStart(2,'0')}-${String(currT.getDate()).padStart(2,'0')}`;
+        
+        const shifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === sStr && s['員工編號'] !== 'SYS_REMARK');
+        shifts.forEach(shift => {
+            markDraft({
+                shiftId: 'C' + new Date().getTime() + Math.random().toString(36).substr(2, 5),
+                date: tStr, dept: shift['部門名稱'], empId: shift['員工編號'], task: shift['工作名稱'], 
+                start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], 
+                remark1: shift['備註'], remark2: shift['備註2']
+            });
+            totalCopied++;
+        });
+    }
+    
+    showToast(`✅ 單週承襲成功，共產生 ${totalCopied} 筆草稿。`);
+    document.getElementById('interactiveDate').value = targetWeek;
+    renderInteractiveGrid();
+}
