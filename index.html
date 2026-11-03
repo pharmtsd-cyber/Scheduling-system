@@ -72,12 +72,14 @@
 <!-- 假日/行事曆排班模式 -->
         <div id="holidayAdminView" class="hidden">
             <h2 class="text-2xl font-bold mb-4 text-pink-700 border-b-2 border-pink-200 pb-2">🌴 行事曆排班模式 (以工作為導向)</h2>
+            
+            <!-- 上方控制列：選擇部門、月份、篩選與承襲 -->
             <div class="bg-white p-4 rounded shadow mb-4 flex flex-wrap gap-4 items-end border-l-4 border-pink-500">
-                <div><label class="block text-xs font-bold text-slate-500">選擇排班部門</label><select id="holidayDeptSelect" class="border p-2 rounded w-48 font-bold" onchange="renderHolidayGrid()"></select></div>
-                <div><label class="block text-xs font-bold text-slate-500">選擇排班月份</label><input type="month" id="holidayMonth" class="border p-2 rounded w-40 font-bold" onchange="renderHolidayGrid()"></div>
+                <div><label class="block text-xs font-bold text-slate-500">選擇排班部門</label><select id="holidayDeptSelect" class="border p-2 rounded w-40 font-bold" onchange="renderHolidayGrid()"></select></div>
+                <div><label class="block text-xs font-bold text-slate-500">選擇排班月份</label><input type="month" id="holidayMonth" class="border p-2 rounded w-36 font-bold" onchange="renderHolidayGrid()"></div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500">篩選排班類別</label>
-                    <select id="holidayCatFilter" class="border p-2 rounded w-48 font-bold text-pink-700 bg-pink-50" onchange="renderHolidayGrid()">
+                    <select id="holidayCatFilter" class="border p-2 rounded w-40 font-bold text-pink-700 bg-pink-50" onchange="renderHolidayGrid()">
                         <option value="ALL">全部顯示</option>
                         <option value="假日班(常規)">假日班(常規)</option>
                         <option value="假日班(補充)">假日班(補充)</option>
@@ -87,7 +89,31 @@
                         <option value="工作日(特殊)">工作日(特殊)</option>
                     </select>
                 </div>
+                
+                <div class="flex-1"></div>
+                <!-- 承襲套用功能 -->
+                <div class="border-l pl-4 border-slate-200">
+                    <label class="block text-xs font-bold text-slate-500">承襲至下個月</label>
+                    <div class="flex gap-2">
+                        <input type="month" id="hTargetMonth" class="border p-2 rounded w-36">
+                        <button onclick="copyHolidayMonth()" class="bg-pink-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-pink-700">🔄 承襲</button>
+                    </div>
+                </div>
             </div>
+
+            <!-- 批次建立常規週期班表 -->
+            <div class="bg-pink-50 p-3 rounded shadow mb-4 border border-pink-200 flex flex-wrap items-center gap-4">
+                <span class="font-bold text-pink-800 text-sm">⚡ 批次建立週期工作：</span>
+                <div>
+                    <select id="batchWeekday" class="border p-1 rounded text-sm"><option value="1">每週一</option><option value="2">每週二</option><option value="3">每週三</option><option value="4">每週四</option><option value="5">每週五</option><option value="6">每週六</option><option value="0">每週日</option></select>
+                </div>
+                <span class="text-sm font-bold text-slate-600">加入</span>
+                <div>
+                    <select id="batchTask" class="border p-1 rounded text-sm text-blue-800 font-bold min-w-[120px]"></select>
+                </div>
+                <button onclick="createBatchHolidayTask()" class="bg-indigo-500 text-white px-3 py-1 rounded text-sm font-bold hover:bg-indigo-600 shadow">執行批次建立</button>
+            </div>
+
             <div class="bg-white p-2 rounded shadow overflow-x-auto">
                 <table class="min-w-full text-sm text-center border-collapse border border-slate-200" id="holidayTable"></table>
             </div>
