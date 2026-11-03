@@ -57,12 +57,24 @@
             <div id="publicBottomRemark" class="bg-yellow-100 text-yellow-800 p-2 rounded mt-2 font-bold hidden border border-yellow-300"></div>
         </div>
 
-        <!-- 假日/行事曆排班模式 -->
+<!-- 假日/行事曆排班模式 -->
         <div id="holidayAdminView" class="hidden">
             <h2 class="text-2xl font-bold mb-4 text-pink-700 border-b-2 border-pink-200 pb-2">🌴 行事曆排班模式 (以工作為導向)</h2>
-            <div class="bg-white p-4 rounded shadow mb-4 flex gap-4 items-end border-l-4 border-pink-500">
+            <div class="bg-white p-4 rounded shadow mb-4 flex flex-wrap gap-4 items-end border-l-4 border-pink-500">
                 <div><label class="block text-xs font-bold text-slate-500">選擇排班部門</label><select id="holidayDeptSelect" class="border p-2 rounded w-48 font-bold" onchange="renderHolidayGrid()"></select></div>
                 <div><label class="block text-xs font-bold text-slate-500">選擇排班月份</label><input type="month" id="holidayMonth" class="border p-2 rounded w-40 font-bold" onchange="renderHolidayGrid()"></div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500">篩選排班類別</label>
+                    <select id="holidayCatFilter" class="border p-2 rounded w-48 font-bold text-pink-700 bg-pink-50" onchange="renderHolidayGrid()">
+                        <option value="ALL">全部顯示</option>
+                        <option value="假日班(常規)">假日班(常規)</option>
+                        <option value="假日班(補充)">假日班(補充)</option>
+                        <option value="假日班(特殊)">假日班(特殊)</option>
+                        <option value="工作日(常規)">工作日(常規)</option>
+                        <option value="工作日(補充)">工作日(補充)</option>
+                        <option value="工作日(特殊)">工作日(特殊)</option>
+                    </select>
+                </div>
             </div>
             <div class="bg-white p-2 rounded shadow overflow-x-auto">
                 <table class="min-w-full text-sm text-center border-collapse border border-slate-200" id="holidayTable"></table>
@@ -99,7 +111,17 @@
         </div>
         <div id="taskAdminView" class="hidden">
             <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">📑 工作項目清單</h2>
-            <button onclick="addTask()" class="mb-4 bg-blue-600 text-white px-4 py-2 rounded font-bold shadow">➕ 新增工作項目</button>
+            <div class="bg-white p-4 rounded shadow mb-4 flex gap-4 items-end border-l-4 border-blue-500">
+                <div><label class="block text-xs font-bold text-slate-500">新工作名稱</label><input type="text" id="newTaskName" class="border p-2 rounded w-48" placeholder="輸入工作名稱"></div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500">預設類別</label>
+                    <select id="newTaskCat" class="border p-2 rounded w-40">
+                        <option value="工作日(常規)">工作日(常規)</option><option value="工作日(補充)">工作日(補充)</option><option value="工作日(特殊)">工作日(特殊)</option>
+                        <option value="假日班(常規)">假日班(常規)</option><option value="假日班(補充)">假日班(補充)</option><option value="假日班(特殊)">假日班(特殊)</option>
+                    </select>
+                </div>
+                <button onclick="addTask()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-blue-700">➕ 新增工作項目</button>
+            </div>
             <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">工作名稱</th><th class="p-2">預設類別</th><th class="p-2">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
         </div>
     </main>
@@ -118,7 +140,12 @@
                     <div class="w-1/2"><label class="text-sm font-bold">開始(HH:MM)</label><input type="time" id="modalStart" class="w-full border p-2 rounded"></div>
                     <div class="w-1/2"><label class="text-sm font-bold">結束(HH:MM)</label><input type="time" id="modalEnd" class="w-full border p-2 rounded"></div>
                 </div>
-                <div><label class="text-sm font-bold">類別</label><select id="modalCat" class="w-full border p-2 rounded"><option value="常規">常規</option><option value="特別備註">特別備註</option></select></div>
+                <div><label class="text-sm font-bold">類別</label>
+                    <select id="modalCat" class="w-full border p-2 rounded">
+                        <option value="工作日(常規)">工作日(常規)</option><option value="工作日(補充)">工作日(補充)</option><option value="工作日(特殊)">工作日(特殊)</option>
+                        <option value="假日班(常規)">假日班(常規)</option><option value="假日班(補充)">假日班(補充)</option><option value="假日班(特殊)">假日班(特殊)</option>
+                    </select>
+                </div>
                 <div><label class="text-sm font-bold text-blue-600">前方備註 (給個人的註解)</label><input type="text" id="modalRemark1" class="w-full border p-2 rounded bg-blue-50"></div>
                 <div><label class="text-sm font-bold text-teal-600">後方備註 (工作的補充說明)</label><input type="text" id="modalRemark2" class="w-full border p-2 rounded bg-teal-50"></div>
             </div>
@@ -167,6 +194,36 @@
             <div class="mt-6 flex justify-end space-x-2">
                 <button onclick="document.getElementById('quickEmpModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600">取消</button>
                 <button onclick="saveQuickEmpEdit()" class="px-4 py-2 bg-teal-600 text-white rounded font-bold">儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 行事曆新增工作 Modal -->
+    <div id="holidayTaskModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-lg shadow-xl w-[400px] p-6">
+            <h3 class="text-xl font-bold mb-4 text-pink-700">➕ 指派行事曆工作</h3>
+            <input type="hidden" id="hTaskDate">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm font-bold text-slate-600">步驟 1：篩選工作類別</label>
+                    <select id="hTaskCat" class="w-full border p-2 rounded bg-pink-50" onchange="filterHolidayTaskOptions()">
+                        <option value="ALL">--顯示該部門所有工作--</option>
+                        <option value="假日班(常規)">假日班(常規)</option>
+                        <option value="假日班(補充)">假日班(補充)</option>
+                        <option value="假日班(特殊)">假日班(特殊)</option>
+                        <option value="工作日(常規)">工作日(常規)</option>
+                        <option value="工作日(補充)">工作日(補充)</option>
+                        <option value="工作日(特殊)">工作日(特殊)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm font-bold text-slate-600">步驟 2：選擇工作項目</label>
+                    <select id="hTaskSelect" class="w-full border p-2 rounded font-bold text-blue-800"></select>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-2">
+                <button onclick="document.getElementById('holidayTaskModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600">取消</button>
+                <button onclick="saveHolidayTask()" class="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded font-bold">確認新增</button>
             </div>
         </div>
     </div>
