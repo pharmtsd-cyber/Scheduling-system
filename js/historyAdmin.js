@@ -141,7 +141,7 @@ function compareShifts(oldShifts, currentShifts) {
 function restoreVersion() {
     if (!selectedSnapshotData) return;
     
-    if (confirm("⚠️ 強烈警告 ⚠️\n\n執行還原將會清除目前畫面上的本月班表，並以選擇的舊版本覆蓋。\n(此操作將會直接將還原結果送出並發佈為最新版本)\n\n您確定要執行時光機還原嗎？")) {
+    if (confirm("⚠️ 強烈警告 ⚠️\n\n執行還原將會清除目前畫面上的本月班表，並以選擇的舊版本覆蓋。\n(此操作將會直接儲存至雲端，請確認無誤後自行點擊發佈新版本)\n\n您確定要執行時光機還原嗎？")) {
         
         const monthStr = document.getElementById('interactiveDate').value.substring(0, 7);
         
@@ -159,11 +159,14 @@ function restoreVersion() {
         });
         
         document.getElementById('historyModal').classList.add('hidden');
-        showToast('🔄 班表已還原至舊版狀態，正在發佈...');
+        showToast('🔄 班表已還原至舊版狀態，正在儲存...');
         
-        // 3. 強制觸發存檔與發佈
+        // 3. 強制觸發存檔 (將覆蓋的資料寫回雲端)
         setTimeout(() => {
-            publishDrafts();
+            saveDraftsToCloud();
+            // 重繪畫面
+            if (!document.getElementById('adminView').classList.contains('hidden')) renderInteractiveGrid();
+            if (!document.getElementById('holidayAdminView').classList.contains('hidden')) renderHolidayGrid();
         }, 500);
     }
 }
