@@ -1,7 +1,6 @@
 async function reloadData() {
     try {
-        // 第一包加入 action=init 讓計數器 +1
-        const res = await fetch(`${GAS_URL}?action=init`);
+        const res = await fetch(GAS_URL); // 移除 ?action=init
         const json = await res.json();
         if(json.status === 'success') {
             appData = {
@@ -13,7 +12,6 @@ async function reloadData() {
                 sysInfo: json.data['系統資訊'] || { viewCount: 0 }
             };
             
-            // 更新計數器畫面
             document.getElementById('sysViewCount').innerText = appData.sysInfo.viewCount;
             
             renderPublicSidebar();
