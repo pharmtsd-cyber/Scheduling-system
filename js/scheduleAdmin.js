@@ -15,7 +15,6 @@ function openAdminDept(deptName) {
     document.getElementById('previewMonth').value = currentMonthStr; 
     document.getElementById('targetMonth').value = nextMonthStr;     
     
-    // 初始化時動態生成，不清空 customStaffOrder，保留拖曳紀錄
     clipboardShift = null; 
     renderInteractiveGrid();
 }
@@ -27,7 +26,7 @@ function getMixedDeptStaff(monthStr) {
     
     let deptStaffMap = new Map();
     appData.staff.forEach(s => {
-        // 條件：在這個月已有班，或是屬於這部門且尚未離職
+        // 條件：在這個月已有班 (包含離職者)，或是屬於這部門且尚未離職
         if (monthEmpIds.has(s['員工編號']) || (s['所屬組別'] === currentDept && s['所屬單位'] !== '離職')) {
             deptStaffMap.set(s['員工編號'], s);
         }
@@ -366,5 +365,7 @@ async function saveQuickEmpEdit() {
     const updateData = { '所屬單位': document.getElementById('qDept').value, '權限': document.getElementById('qAuth').value, '停用時間': endVal, '所屬類別': document.getElementById('qCategory').value, '所屬組別': document.getElementById('qGroup').value };
     document.getElementById('quickEmpModal').classList.add('hidden');
     await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData });
-    if (!document.getElementById('employeeAdminView').classList.contains('hidden')) renderEmployeeList();
+    if (!document.getElementById('employeeAdminView').classList.contains('hidden')) {
+        if(typeof renderEmployeeList === 'function') renderEmployeeList();
+    }
 }
