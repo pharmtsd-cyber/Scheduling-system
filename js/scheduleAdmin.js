@@ -20,15 +20,17 @@ function openAdminDept(deptName) {
     renderInteractiveGrid();
 }
 
-// ★ 取得該部門該月份應顯示的「混合員工名單 (目前編制 + 歷史排班)」
+// ★ 取得該部門該月份應顯示的「混合員工名單」
 function getMixedDeptStaff(monthStr) {
     const monthShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr));
     const monthEmpIds = new Set(monthShifts.map(s => s['員工編號']));
     
     let deptStaffMap = new Map();
     appData.staff.forEach(s => {
-        // 若目前組別是這部門，或是這個月在這裡有被排班，就納入名單
-        if (s['所屬組別'] === currentDept || monthEmpIds.has(s['員工編號'])) {
+        // 💡 核心修改：
+        // 條件 1：他在這個月「已經有被排班」(保留舊歷史，或提醒主管承襲後需交接)
+        // 條件 2：他在這個月沒班，但他目前屬於這部門且「尚未離職」
+        if (monthEmpIds.has(s['員工編號']) || (s['所屬組別'] === currentDept && s['所屬單位'] !== '離職')) {
             deptStaffMap.set(s['員工編號'], s);
         }
     });
