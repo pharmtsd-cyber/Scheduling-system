@@ -171,6 +171,17 @@
         </div>
         <div id="taskAdminView" class="hidden">
             <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">📑 工作項目清單</h2>
+            
+            <div class="flex gap-4 mb-4">
+                <select id="taskDeptFilter" onchange="renderTaskList()" class="border p-2 rounded w-1/4 shadow-sm font-bold text-indigo-800"></select>
+                <input type="text" id="taskSearchInput" onkeyup="renderTaskList()" placeholder="🔍 搜尋工作名稱..." class="w-1/3 border p-2 rounded shadow-sm">
+                <select id="taskCatFilter" onchange="renderTaskList()" class="border p-2 rounded w-1/4 shadow-sm font-bold text-blue-800">
+                    <option value="ALL">全部類別</option>
+                    <option value="工作日">僅看工作日</option>
+                    <option value="假日班">僅看假日班</option>
+                </select>
+            </div>
+
             <div class="bg-white p-4 rounded shadow mb-4 flex gap-4 items-end border-l-4 border-blue-500">
                 <input type="hidden" id="editTaskId">
                 <div><label class="block text-xs font-bold text-slate-500">工作名稱</label><input type="text" id="newTaskName" class="border p-2 rounded w-48 font-bold text-blue-800" placeholder="輸入工作名稱"></div>
@@ -187,16 +198,7 @@
                 </div>
             </div>
             
-            <div class="flex gap-4 mb-4">
-                <input type="text" id="taskSearchInput" onkeyup="renderTaskList()" placeholder="🔍 搜尋工作名稱..." class="w-1/3 border p-2 rounded shadow-sm">
-                <select id="taskCatFilter" onchange="renderTaskList()" class="border p-2 rounded w-1/4 shadow-sm font-bold text-blue-800">
-                    <option value="ALL">全部類別</option>
-                    <option value="工作日">僅看工作日</option>
-                    <option value="假日班">僅看假日班</option>
-                </select>
-            </div>
-
-            <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">工作名稱</th><th class="p-2">預設類別</th><th class="p-2">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
+            <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">所屬部門</th><th class="p-2">工作名稱</th><th class="p-2">預設類別</th><th class="p-2">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
         </div>
     </main>
 
