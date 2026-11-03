@@ -15,17 +15,56 @@ function openAdminDept(deptName) {
     document.getElementById('previewMonth').value = currentMonthStr; 
     document.getElementById('targetMonth').value = nextMonthStr;     
     
-    const deptStaff = appData.staff.filter(s => s['所屬組別'] === currentDept);
-    customStaffOrder = deptStaff.map(s => s['員工編號']);
-    
+    // 初始化時先不強制給 customStaffOrder，改在 render 時動態生成
     clipboardShift = null; 
     renderInteractiveGrid();
+}
+
+// ★ 取得該部門該月份應顯示的「混合員工名單 (目前編制 + 歷史排班)」
+function getMixedDeptStaff(monthStr) {
+    const monthShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr));
+    const monthEmpIds = new Set(monthShifts.map(s => s['員工編號']));
+    
+    let deptStaffMap = new Map();
+    appData.staff.forEach(s => {
+        // 若目前組別是這部門，或是這個月在這裡有被排班，就納入名單
+        if (s['所屬組別'] === currentDept || monthEmpIds.has(s['員工編號'])) {
+            deptStaffMap.set(s['員工編號'], s);
+        }
+    });
+    deptStaffMap.delete('SYS_REMARK'); // 排除系統備註假帳號
+    
+    let deptStaff = Array.from(deptStaffMap.values());
+    deptStaff.sort((a, b) => {
+        let idxA = customStaffOrder.indexOf(a['員工編號']); let idxB = customStaffOrder.indexOf(b['員工編號']);
+        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    });
+    return { deptStaff, deptStaffMap };
+}
+
+// 產生帶有 optgroup 的全院員工 HTML 選單
+function buildEmpSelectOptions(deptStaffMap, selectedEmpId = '') {
+    let options = `<optgroup label="本單位 / 本月相關人員">`;
+    Array.from(deptStaffMap.values()).forEach(emp => {
+        const selected = emp['員工編號'] === selectedEmpId ? 'selected' : '';
+        options += `<option value="${emp['員工編號']}" ${selected}>${emp['姓名']}</option>`;
+    });
+    options += `</optgroup><optgroup label="全院其他人員 (跨單位支援)">`;
+    appData.staff.forEach(emp => {
+        if (!deptStaffMap.has(emp['員工編號']) && emp['員工編號'] !== 'SYS_REMARK' && emp['所屬單位'] !== '離職') {
+            const selected = emp['員工編號'] === selectedEmpId ? 'selected' : '';
+            options += `<option value="${emp['員工編號']}" ${selected}>${emp['姓名']} (${emp['所屬組別']||'無'})</option>`;
+        }
+    });
+    options += `</optgroup>`;
+    return options;
 }
 
 function renderInteractiveGrid() {
     const container = document.getElementById('interactiveGrid');
     container.innerHTML = '';
     const date = document.getElementById('interactiveDate').value;
+    const currentMonthStr = date.substring(0, 7);
     const shifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === date);
     
     const dailyRemarkShift = shifts.find(s => s['員工編號'] === 'SYS_REMARK') || {};
@@ -33,11 +72,7 @@ function renderInteractiveGrid() {
     const bottomRemark = dailyRemarkShift['備註2'] || '';
     const dailyRemarkId = dailyRemarkShift['排班ID'] || ('SYS_' + date.replace(/-/g,''));
 
-    let deptStaff = appData.staff.filter(s => s['所屬組別'] === currentDept);
-    deptStaff.sort((a, b) => {
-        let idxA = customStaffOrder.indexOf(a['員工編號']); let idxB = customStaffOrder.indexOf(b['員工編號']);
-        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-    });
+    const { deptStaff, deptStaffMap } = getMixedDeptStaff(currentMonthStr);
 
     let topRemarkHtml = `<div class="bg-yellow-50 border-b border-yellow-200 p-2 flex items-center gap-2">
         <span class="text-yellow-700 font-bold text-sm shrink-0">📢 頂部備註：</span>
@@ -63,11 +98,18 @@ function renderInteractiveGrid() {
         let shiftId = mainShift ? mainShift['排班ID'] : '';
         let r1 = mainShift ? (mainShift['備註'] || '') : '';
         let r2 = mainShift ? (mainShift['備註2'] || '') : '';
+        
+        // 離職與跨單位狀態標示
+        let empStatusTag = '';
+        if (emp['所屬單位'] === '離職') empStatusTag = `<span class="text-[9px] text-red-500 bg-red-50 rounded px-1">離職</span>`;
+        else if (emp['所屬組別'] !== currentDept) empStatusTag = `<span class="text-[9px] text-orange-500 bg-orange-50 rounded px-1" title="跨單位支援">外援</span>`;
 
         let rowHtml = `<div class="flex timeline-container group hover:bg-slate-50 transition border-b h-[50px]">
             <div class="w-24 p-1 border-r bg-white flex flex-col items-center justify-center shadow-sm z-10 relative cursor-ns-resize shrink-0"
                  draggable="true" ondragstart="dragRow(event, '${emp['員工編號']}')" ondragover="allowDrop(event)" ondrop="dropRow(event, '${emp['員工編號']}')" title="上下拖曳排序人員">
-                <div class="font-bold text-blue-700 cursor-pointer hover:underline text-sm truncate w-full text-center" onclick="openQuickEmpEdit('${emp['員工編號']}')">${emp['姓名']}</div>
+                <div class="font-bold text-blue-700 cursor-pointer hover:underline text-sm truncate w-full text-center flex flex-col items-center gap-0.5" onclick="openQuickEmpEdit('${emp['員工編號']}')">
+                    ${emp['姓名']} ${empStatusTag}
+                </div>
                 ${clipboardShift ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[9px] bg-indigo-100 text-indigo-700 px-2 mt-1 rounded shadow hover:bg-indigo-200">📋貼上</button>` : ''}
             </div>
             <div class="w-32 border-r bg-blue-50/50 flex items-center p-1 shrink-0">
@@ -109,27 +151,21 @@ function renderInteractiveGrid() {
     container.innerHTML += bottomRemarkHtml;
 }
 
-// ⚠️ 全部改為標記草稿，不打 API
 function saveDailyRemark(shiftId, topVal, bottomVal) {
     const date = document.getElementById('interactiveDate').value;
     const existing = appData.shifts.find(s => s['排班ID'] === shiftId) || {};
-    const r1 = topVal !== null ? topVal : (existing['備註'] || '');
-    const r2 = bottomVal !== null ? bottomVal : (existing['備註2'] || '');
-
     markDraft({
-        shiftId, date, dept: currentDept,
-        empId: 'SYS_REMARK', task: 'SYS_REMARK', start: '00:00', end: '00:00', category: 'SYS',
-        remark1: r1, remark2: r2
+        shiftId, date, dept: currentDept, empId: 'SYS_REMARK', task: 'SYS_REMARK', start: '00:00', end: '00:00', category: 'SYS',
+        remark1: topVal !== null ? topVal : (existing['備註'] || ''), 
+        remark2: bottomVal !== null ? bottomVal : (existing['備註2'] || '')
     });
 }
 
 function updateShiftRemarks(shiftId, r1, r2) {
-    if(!shiftId) return;
     const shift = appData.shifts.find(s => s['排班ID'] === shiftId);
     if(shift) {
         markDraft({ 
-            shiftId, date: shift['日期'], dept: shift['部門名稱'], 
-            empId: shift['員工編號'], task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], 
+            shiftId, date: shift['日期'], dept: shift['部門名稱'], empId: shift['員工編號'], task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], 
             remark1: r1 !== null ? r1 : shift['備註'], remark2: r2 !== null ? r2 : shift['備註2'] 
         });
     }
@@ -146,11 +182,12 @@ function dragRow(ev, empId) { ev.dataTransfer.setData("rowEmpId", empId); }
 function dropRow(ev, targetEmpId) {
     ev.preventDefault(); ev.stopPropagation(); const sourceEmpId = ev.dataTransfer.getData("rowEmpId");
     if (sourceEmpId && sourceEmpId !== targetEmpId) {
+        if (!customStaffOrder.includes(sourceEmpId)) customStaffOrder.push(sourceEmpId);
+        if (!customStaffOrder.includes(targetEmpId)) customStaffOrder.push(targetEmpId);
         const sourceIdx = customStaffOrder.indexOf(sourceEmpId); const targetIdx = customStaffOrder.indexOf(targetEmpId);
         if (sourceIdx !== -1 && targetIdx !== -1) { customStaffOrder.splice(sourceIdx, 1); customStaffOrder.splice(targetIdx, 0, sourceEmpId); renderInteractiveGrid(); }
     }
 }
-
 function dragShift(ev, shiftId) { ev.dataTransfer.setData("shiftId", shiftId); ev.stopPropagation(); }
 function dropShift(ev, newEmpId) {
     ev.preventDefault(); const shiftId = ev.dataTransfer.getData("shiftId"); if(!shiftId) return; 
@@ -167,11 +204,16 @@ function dropShift(ev, newEmpId) {
 
 function openShiftModal(shiftId = null) {
     const modal = document.getElementById('shiftModal');
-    document.getElementById('modalEmp').innerHTML = appData.staff.filter(s => s['所屬組別'] === currentDept).map(e => `<option value="${e['員工編號']}">${e['姓名']}</option>`).join('');
-    document.getElementById('modalTask').innerHTML = appData.tasks.filter(t => t['部門名稱'] === currentDept || !t['部門名稱']).map(t => `<option value="${t['工作名稱']}">${t['工作名稱']}</option>`).join('');
+    const { deptStaffMap } = getMixedDeptStaff(document.getElementById('interactiveDate').value.substring(0,7));
+    const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentDept || !t['部門名稱']);
+    
+    let selectedEmpId = shiftId ? (appData.shifts.find(s => s['排班ID'] === shiftId)?.['員工編號'] || '') : '';
+    document.getElementById('modalEmp').innerHTML = buildEmpSelectOptions(deptStaffMap, selectedEmpId);
+    document.getElementById('modalTask').innerHTML = deptTasks.map(t => `<option value="${t['工作名稱']}">${t['工作名稱']}</option>`).join('');
+    
     if(shiftId) {
         const shift = appData.shifts.find(s => s['排班ID'] === shiftId);
-        document.getElementById('modalTitle').innerText = '編輯工作'; document.getElementById('modalShiftId').value = shiftId; document.getElementById('modalEmp').value = shift['員工編號']; document.getElementById('modalTask').value = shift['工作名稱']; document.getElementById('modalStart').value = shift['開始時間']; document.getElementById('modalEnd').value = shift['結束時間']; document.getElementById('modalCat').value = shift['工作類別']; document.getElementById('modalRemark1').value = shift['備註'] || ''; document.getElementById('modalRemark2').value = shift['備註2'] || ''; document.getElementById('btnDeleteShift').classList.remove('hidden');
+        document.getElementById('modalTitle').innerText = '編輯工作'; document.getElementById('modalShiftId').value = shiftId; document.getElementById('modalTask').value = shift['工作名稱']; document.getElementById('modalStart').value = shift['開始時間']; document.getElementById('modalEnd').value = shift['結束時間']; document.getElementById('modalCat').value = shift['工作類別']; document.getElementById('modalRemark1').value = shift['備註'] || ''; document.getElementById('modalRemark2').value = shift['備註2'] || ''; document.getElementById('btnDeleteShift').classList.remove('hidden');
     } else {
         document.getElementById('modalTitle').innerText = '新增工作'; document.getElementById('modalShiftId').value = 'S' + new Date().getTime(); document.getElementById('modalStart').value = '08:00'; document.getElementById('modalEnd').value = '12:00'; document.getElementById('modalRemark1').value = ''; document.getElementById('modalRemark2').value = ''; document.getElementById('btnDeleteShift').classList.add('hidden');
     }
@@ -184,84 +226,43 @@ function saveShift() {
         shiftId: document.getElementById('modalShiftId').value, date: document.getElementById('interactiveDate').value, dept: currentDept, 
         empId: document.getElementById('modalEmp').value, task: document.getElementById('modalTask').value, start: document.getElementById('modalStart').value, end: document.getElementById('modalEnd').value, category: document.getElementById('modalCat').value, remark1: document.getElementById('modalRemark1').value, remark2: document.getElementById('modalRemark2').value 
     }); 
-    closeShiftModal();
-    renderInteractiveGrid();
+    closeShiftModal(); renderInteractiveGrid();
 }
 
-// 刪除與跨月承襲會直接影響整體架構，依然保留直接打 API 的機制
 async function deleteShift() { if(confirm("確定刪除此工作？")) { await postAction({ action: 'delete_shift', shiftId: document.getElementById('modalShiftId').value }); closeShiftModal(); } }
 async function copyMonthSchedule() {
-    const sourceMonth = document.getElementById('previewMonth').value;
-    const targetMonth = document.getElementById('targetMonth').value;
-    
-    if(!sourceMonth || !targetMonth) return alert("請確認已選擇「預覽來源月份」與「目標承襲月份」！");
-    if(sourceMonth === targetMonth) return alert("來源與目標月份不可相同！");
-    
-    if(confirm(`⚠️ 請確認承襲操作：\n\n系統即將把 [${sourceMonth}] 的【全部班表】(包含所有平日班、假日班與批次週期任務)\n複製到 [${targetMonth}]。\n\n※ 系統會自動智慧對齊星期幾，確定要執行嗎？`)) {
-        
-        await postAction({ action: 'copy_month_template', sourceMonth, targetMonth, deptName: currentDept });
-        
-        // 成功後，自動將預覽畫面切換到目標月份，方便主管直接開始微調
-        document.getElementById('previewMonth').value = targetMonth;
-        document.getElementById('interactiveDate').value = `${targetMonth}-01`;
-        
-        // 自動把目標月往後推一個月，準備下一次承襲
-        const [y, m] = targetMonth.split('-');
-        const nextTargetDate = new Date(y, parseInt(m), 1);
-        document.getElementById('targetMonth').value = `${nextTargetDate.getFullYear()}-${String(nextTargetDate.getMonth() + 1).padStart(2, '0')}`;
-        
+    const sourceMonth = document.getElementById('previewMonth').value; const targetMonth = document.getElementById('targetMonth').value;
+    if(sourceMonth && targetMonth && confirm(`⚠️ 請確認承襲操作：\n\n系統即將把 [${sourceMonth}] 的【全部班表】\n複製到 [${targetMonth}]。\n\n※ 系統會自動智慧對齊星期幾，確定要執行嗎？`)) { 
+        await postAction({ action: 'copy_month_template', sourceMonth, targetMonth, deptName: currentDept }); 
+        document.getElementById('previewMonth').value = targetMonth; document.getElementById('interactiveDate').value = `${targetMonth}-01`;
+        const [y, m] = targetMonth.split('-'); const nextT = new Date(y, parseInt(m), 1); document.getElementById('targetMonth').value = `${nextT.getFullYear()}-${String(nextT.getMonth()+1).padStart(2,'0')}`;
         renderInteractiveGrid();
     }
 }
 
 function formatDateForInput(dateStr) {
     if(!dateStr) return '';
-    try {
-        const d = new Date(dateStr);
-        if(isNaN(d.getTime())) return '';
-        const yyyy = d.getFullYear(); const mm = String(d.getMonth()+1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
-    } catch(e) { return ''; }
+    try { const d = new Date(dateStr); if(isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; } catch(e) { return ''; }
 }
 
 function openQuickEmpEdit(empId) {
-    const emp = appData.staff.find(e => e['員工編號'] === empId);
-    if(!emp) return;
-    document.getElementById('qEmpId').value = empId;
-    document.getElementById('qEmpName').innerText = emp['姓名'];
-    document.getElementById('qDept').value = emp['所屬單位'] || '藥學部';
-    document.getElementById('qAuth').value = emp['權限'] || '';
-    document.getElementById('qStartDisplay').innerText = emp['啟用時間'] || '無紀錄';
-    document.getElementById('qStart').value = emp['啟用時間'] || '';
-    
-    let endStr = emp['停用時間'] || '';
-    if(endStr && !endStr.includes('T')) endStr = endStr.replace(' ', 'T'); 
-    document.getElementById('qEnd').value = endStr;
-    
-    document.getElementById('qCategory').value = emp['所屬類別'] || '';
-    document.getElementById('qGroup').value = emp['所屬組別'] || '';
-    document.getElementById('quickEmpModal').classList.remove('hidden');
+    const emp = appData.staff.find(e => e['員工編號'] === empId); if(!emp) return;
+    document.getElementById('qEmpId').value = empId; document.getElementById('qEmpName').innerText = emp['姓名']; document.getElementById('qDept').value = emp['所屬單位'] || '藥學部'; document.getElementById('qAuth').value = emp['權限'] || ''; document.getElementById('qStartDisplay').innerText = emp['啟用時間'] || '無紀錄'; document.getElementById('qStart').value = emp['啟用時間'] || '';
+    let endStr = emp['停用時間'] || ''; if(endStr && !endStr.includes('T')) endStr = endStr.replace(' ', 'T'); document.getElementById('qEnd').value = endStr;
+    document.getElementById('qCategory').value = emp['所屬類別'] || ''; document.getElementById('qGroup').value = emp['所屬組別'] || ''; document.getElementById('quickEmpModal').classList.remove('hidden');
 }
 
 function handleDeptChange(val) {
     if(val === '離職') {
-        const now = new Date();
-        const yyyy = now.getFullYear(); const mm = String(now.getMonth()+1).padStart(2,'0'); const dd = String(now.getDate()).padStart(2,'0');
-        const hh = String(now.getHours()).padStart(2,'0'); const min = String(now.getMinutes()).padStart(2,'0'); const ss = String(now.getSeconds()).padStart(2,'0');
+        const now = new Date(); const yyyy = now.getFullYear(); const mm = String(now.getMonth()+1).padStart(2,'0'); const dd = String(now.getDate()).padStart(2,'0'); const hh = String(now.getHours()).padStart(2,'0'); const min = String(now.getMinutes()).padStart(2,'0'); const ss = String(now.getSeconds()).padStart(2,'0');
         document.getElementById('qEnd').value = `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
     }
 }
 
 async function saveQuickEmpEdit() {
-    let endVal = document.getElementById('qEnd').value;
-    if(endVal) endVal = endVal.replace('T', ' '); 
+    let endVal = document.getElementById('qEnd').value; if(endVal) endVal = endVal.replace('T', ' '); 
     const updateData = { '所屬單位': document.getElementById('qDept').value, '權限': document.getElementById('qAuth').value, '停用時間': endVal, '所屬類別': document.getElementById('qCategory').value, '所屬組別': document.getElementById('qGroup').value };
     document.getElementById('quickEmpModal').classList.add('hidden');
-    
     await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData });
-    
-    // 如果目前畫面停留在員工名冊維護，則自動重繪該清單
-    if (!document.getElementById('employeeAdminView').classList.contains('hidden')) {
-        renderEmployeeList();
-    }
+    if (!document.getElementById('employeeAdminView').classList.contains('hidden')) renderEmployeeList();
 }
