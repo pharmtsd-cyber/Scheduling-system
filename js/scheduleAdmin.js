@@ -191,8 +191,27 @@ function saveShift() {
 // 刪除與跨月承襲會直接影響整體架構，依然保留直接打 API 的機制
 async function deleteShift() { if(confirm("確定刪除此工作？")) { await postAction({ action: 'delete_shift', shiftId: document.getElementById('modalShiftId').value }); closeShiftModal(); } }
 async function copyMonthSchedule() {
-    const sourceMonth = document.getElementById('previewMonth').value; const targetMonth = document.getElementById('targetMonth').value;
-    if(sourceMonth && targetMonth && confirm(`承襲 ${sourceMonth} 至 ${targetMonth}？`)) { await postAction({ action: 'copy_month_template', sourceMonth, targetMonth, deptName: currentDept }); }
+    const sourceMonth = document.getElementById('previewMonth').value;
+    const targetMonth = document.getElementById('targetMonth').value;
+    
+    if(!sourceMonth || !targetMonth) return alert("請確認已選擇「預覽來源月份」與「目標承襲月份」！");
+    if(sourceMonth === targetMonth) return alert("來源與目標月份不可相同！");
+    
+    if(confirm(`⚠️ 請確認承襲操作：\n\n系統即將把 [${sourceMonth}] 的【全部班表】(包含所有平日班、假日班與批次週期任務)\n複製到 [${targetMonth}]。\n\n※ 系統會自動智慧對齊星期幾，確定要執行嗎？`)) {
+        
+        await postAction({ action: 'copy_month_template', sourceMonth, targetMonth, deptName: currentDept });
+        
+        // 成功後，自動將預覽畫面切換到目標月份，方便主管直接開始微調
+        document.getElementById('previewMonth').value = targetMonth;
+        document.getElementById('interactiveDate').value = `${targetMonth}-01`;
+        
+        // 自動把目標月往後推一個月，準備下一次承襲
+        const [y, m] = targetMonth.split('-');
+        const nextTargetDate = new Date(y, parseInt(m), 1);
+        document.getElementById('targetMonth').value = `${nextTargetDate.getFullYear()}-${String(nextTargetDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        renderInteractiveGrid();
+    }
 }
 
 function formatDateForInput(dateStr) {
