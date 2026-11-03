@@ -10,7 +10,11 @@ function openHolidayAdmin() {
 
     const now = new Date();
     document.getElementById('holidayMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    document.getElementById('holidayCatFilter').value = 'ALL'; // 預設顯示全部
+    
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    document.getElementById('hTargetMonth').value = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+    
+    document.getElementById('holidayCatFilter').value = 'ALL'; 
 
     renderHolidayGrid();
 }
@@ -27,13 +31,15 @@ function renderHolidayGrid() {
         return;
     }
 
+    const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentHolidayDept || !t['部門名稱']);
+    const batchTaskSelect = document.getElementById('batchTask');
+    batchTaskSelect.innerHTML = '';
+    deptTasks.forEach(t => batchTaskSelect.innerHTML += `<option value="${t['工作名稱']}">${t['工作名稱']}</option>`);
+
     const deptStaff = appData.staff.filter(s => s['所屬組別'] === currentHolidayDept);
     
-    // 找出該月所有排班，並套用類別篩選
     let monthShifts = appData.shifts.filter(s => s['部門名稱'] === currentHolidayDept && s['日期'].startsWith(monthStr));
-    if (catFilter !== 'ALL') {
-        monthShifts = monthShifts.filter(s => s['工作類別'] === catFilter);
-    }
+    if (catFilter !== 'ALL') monthShifts = monthShifts.filter(s => s['工作類別'] === catFilter);
 
     const [yyyy, mm] = monthStr.split('-');
     const daysInMonth = new Date(yyyy, mm, 0).getDate();
@@ -86,18 +92,72 @@ function renderHolidayGrid() {
     table.innerHTML = tbody;
 }
 
-// 開啟新增工作彈窗 (連動類別過濾)
+// === 改為直接標記草稿，不打 API ===
+function createBatchHolidayTask() {
+    const targetWeekday = parseInt(document.getElementById('batchWeekday').value);
+    const taskName = document.getElementById('batchTask').value;
+    const monthStr = document.getElementById('holidayMonth').value;
+    
+    if(!taskName) return alert("請先建立並選擇工作項目");
+    
+    const taskInfo = appData.tasks.find(t => t['工作名稱'] === taskName);
+    const taskCat = taskInfo ? taskInfo['預設類別'] : '假日班(常規)';
+    
+    const [yyyy, mm] = monthStr.split('-');
+    const daysInMonth = new Date(yyyy, mm, 0).getDate();
+    
+    let datesToCreate = [];
+    for(let d=1; d<=daysInMonth; d++) {
+        const dateObj = new Date(yyyy, parseInt(mm)-1, d);
+        if(dateObj.getDay() === targetWeekday) {
+            datesToCreate.push(`${yyyy}-${mm}-${String(d).padStart(2,'0')}`);
+        }
+    }
+    
+    if(datesToCreate.length === 0) return;
+    
+    if(confirm(`將在 ${monthStr} 月的每個星期${['日','一','二','三','四','五','六'][targetWeekday]}，\n共 ${datesToCreate.length} 天，批次建立「${taskName}」草稿，確定嗎？`)) {
+        
+        datesToCreate.forEach((dateStr, index) => {
+            const shiftId = 'H' + new Date().getTime() + index + Math.random().toString().substr(2,4);
+            markDraft({
+                shiftId, date: dateStr, dept: currentHolidayDept,
+                empId: '', task: taskName, start: '08:00', end: '17:00', 
+                category: taskCat, remark1: '', remark2: ''
+            });
+        });
+        
+        showToast(`✅ 已產生 ${datesToCreate.length} 筆草稿！請記得點擊「儲存並發佈」`);
+        renderHolidayGrid();
+    }
+}
+
+async function copyHolidayMonth() {
+    const sourceMonth = document.getElementById('holidayMonth').value;
+    const targetMonth = document.getElementById('hTargetMonth').value;
+    
+    if(!sourceMonth || !targetMonth) return alert("請確認已選擇預覽月份與目標月份！");
+    
+    if(confirm(`即將把 [${sourceMonth}] 的行事曆架構完全複製到 [${targetMonth}]，\n包含已經指派的人員也會一併帶入，確定嗎？`)) {
+        await postAction({ action: 'copy_month_template', sourceMonth, targetMonth, deptName: currentHolidayDept });
+        
+        document.getElementById('holidayMonth').value = targetMonth;
+        const [y, m] = targetMonth.split('-');
+        const nextTargetDate = new Date(y, parseInt(m), 1);
+        document.getElementById('hTargetMonth').value = `${nextTargetDate.getFullYear()}-${String(nextTargetDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        renderHolidayGrid();
+    }
+}
+
 function openHolidayTaskModal(dateStr) {
     document.getElementById('hTaskDate').value = dateStr;
-    // 預設選中目前的篩選器類別 (如果是 ALL，就讓使用者自己選，或預設一個)
     const currentFilter = document.getElementById('holidayCatFilter').value;
     document.getElementById('hTaskCat').value = currentFilter !== 'ALL' ? currentFilter : '假日班(常規)';
-    
     filterHolidayTaskOptions();
     document.getElementById('holidayTaskModal').classList.remove('hidden');
 }
 
-// 根據選取的類別，過濾工作清單下拉選單
 function filterHolidayTaskOptions() {
     const selectedCat = document.getElementById('hTaskCat').value;
     const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentHolidayDept || !t['部門名稱']);
@@ -118,26 +178,23 @@ function filterHolidayTaskOptions() {
     }
 }
 
-// 儲存行事曆工作
-async function saveHolidayTask() {
+function saveHolidayTask() {
     const dateStr = document.getElementById('hTaskDate').value;
     const taskName = document.getElementById('hTaskSelect').value;
     let taskCat = document.getElementById('hTaskCat').value;
     
-    if(!taskName) return alert('請選擇有效的工作項目，若無項目請先至「工作清單維護」新增。');
+    if(!taskName) return alert('請選擇有效的工作項目');
     
-    // 如果類別選了 ALL，就去找這份工作在資料庫的預設類別
     if (taskCat === 'ALL') {
         const taskInfo = appData.tasks.find(t => t['工作名稱'] === taskName);
         taskCat = taskInfo ? taskInfo['預設類別'] : '假日班(常規)';
     }
 
     const shiftId = 'H' + new Date().getTime();
-    
     document.getElementById('holidayTaskModal').classList.add('hidden');
     
-    await postAction({
-        action: 'save_shift', shiftId, date: dateStr, dept: currentHolidayDept,
+    markDraft({
+        shiftId, date: dateStr, dept: currentHolidayDept,
         empId: '', task: taskName, start: '08:00', end: '17:00', 
         category: taskCat, remark1: '', remark2: ''
     });
@@ -145,11 +202,11 @@ async function saveHolidayTask() {
     renderHolidayGrid();
 }
 
-async function updateHolidayEmp(shiftId, empId) {
+function updateHolidayEmp(shiftId, empId) {
     const shift = appData.shifts.find(s => s['排班ID'] === shiftId);
     if(shift) {
-        await postAction({ 
-            action: 'save_shift', shiftId, date: shift['日期'], dept: shift['部門名稱'], 
+        markDraft({ 
+            shiftId, date: shift['日期'], dept: shift['部門名稱'], 
             empId: empId, task: shift['工作名稱'], start: shift['開始時間'], 
             end: shift['結束時間'], category: shift['工作類別'], 
             remark1: shift['備註'], remark2: shift['備註2'] 
