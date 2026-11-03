@@ -1,6 +1,20 @@
+// ==========================================
+// 員工名冊維護 (多重篩選器)
+// ==========================================
 function showEmployeeMaint() {
     hideAllViews(); 
     document.getElementById('employeeAdminView').classList.remove('hidden');
+
+    // 動態取得目前擁有的類別與組別
+    const catSelect = document.getElementById('empCatFilter');
+    const groupSelect = document.getElementById('empGroupFilter');
+    
+    let cats = [...new Set(appData.staff.map(s => s['所屬類別']).filter(Boolean))];
+    let groups = [...new Set(appData.staff.map(s => s['所屬組別']).filter(Boolean))];
+
+    catSelect.innerHTML = '<option value="ALL">全部類別</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    groupSelect.innerHTML = '<option value="ALL">全部組別</option>' + groups.map(g => `<option value="${g}">${g}</option>`).join('');
+
     document.getElementById('empSearchInput').value = '';
     renderEmployeeList();
 }
@@ -8,21 +22,31 @@ function showEmployeeMaint() {
 function renderEmployeeList() {
     const tbody = document.getElementById('empTableBody');
     tbody.innerHTML = '';
+    
+    const deptFilter = document.getElementById('empDeptFilter').value;
+    const catFilter = document.getElementById('empCatFilter').value;
+    const groupFilter = document.getElementById('empGroupFilter').value;
     const keyword = document.getElementById('empSearchInput').value.toLowerCase();
     
-    // 預設依員工編號排序
-    let staff = [...appData.staff].sort((a, b) => a['員工編號'].localeCompare(b['員工編號']));
+    let staff = [...appData.staff];
+
+    // 條件過濾
+    if (deptFilter !== 'ALL') staff = staff.filter(s => (s['所屬單位'] || '') === deptFilter);
+    if (catFilter !== 'ALL') staff = staff.filter(s => (s['所屬類別'] || '') === catFilter);
+    if (groupFilter !== 'ALL') staff = staff.filter(s => (s['所屬組別'] || '') === groupFilter);
     
     // 模糊搜尋
     if (keyword) {
         staff = staff.filter(s => 
             s['員工編號'].toLowerCase().includes(keyword) || 
-            s['姓名'].toLowerCase().includes(keyword) || 
-            (s['所屬組別'] || '').toLowerCase().includes(keyword)
+            s['姓名'].toLowerCase().includes(keyword)
         );
     }
+
+    // ★ 依編號排序
+    staff.sort((a, b) => String(a['員工編號']).localeCompare(String(b['員工編號'])));
     
-    if(staff.length === 0) return tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-slate-400 font-bold">查無符合資料</td></tr>';
+    if(staff.length === 0) return tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 font-bold">查無符合資料</td></tr>';
 
     staff.forEach(emp => {
         const isResigned = (emp['所屬單位'] === '離職');
@@ -33,6 +57,7 @@ function renderEmployeeList() {
             <tr class="border-b ${rowClass}">
                 <td class="p-3 text-slate-500 font-mono">${emp['員工編號']}</td>
                 <td class="p-3 font-bold ${nameColor}">${emp['姓名']}</td>
+                <td class="p-3 text-slate-600">${emp['所屬類別'] || ''}</td>
                 <td class="p-3 text-blue-700 font-bold">${emp['所屬組別'] || '<span class="text-slate-400 font-normal">未指派</span>'}</td>
                 <td class="p-3">
                     <button onclick="openQuickEmpEdit('${emp['員工編號']}')" class="text-blue-600 font-bold hover:bg-blue-50 border border-blue-200 px-3 py-1 rounded transition">編輯屬性</button>
@@ -41,9 +66,22 @@ function renderEmployeeList() {
     });
 }
 
+
+// ==========================================
+// 工作項目維護 (搜尋與編輯)
+// ==========================================
 function showTaskMaint() {
     hideAllViews(); 
     document.getElementById('taskAdminView').classList.remove('hidden');
+    
+    // 載入部門篩選器
+    const deptSelect = document.getElementById('taskDeptFilter');
+    deptSelect.innerHTML = '<option value="ALL">全部部門</option>';
+    appData.depts.forEach(d => {
+        const selected = (d['部門名稱'] === currentDept) ? 'selected' : '';
+        deptSelect.innerHTML += `<option value="${d['部門名稱']}" ${selected}>${d['部門名稱']}</option>`;
+    });
+
     resetTaskForm();
     renderTaskList();
 }
@@ -52,25 +90,26 @@ function renderTaskList() {
     const tbody = document.getElementById('taskTableBody');
     tbody.innerHTML = '';
     
+    const deptFilter = document.getElementById('taskDeptFilter').value;
+    const catFilter = document.getElementById('taskCatFilter').value;
     const keyword = document.getElementById('taskSearchInput').value.toLowerCase();
-    const filter = document.getElementById('taskCatFilter').value;
     
-    let tasks = appData.tasks.filter(t => t['部門名稱'] === currentDept || !t['部門名稱']);
+    let tasks = [...appData.tasks];
     
-    // 名稱排序
+    if (deptFilter !== 'ALL') tasks = tasks.filter(t => t['部門名稱'] === deptFilter);
+    if (catFilter !== 'ALL') tasks = tasks.filter(t => (t['預設類別'] || '').includes(catFilter));
+    if (keyword) tasks = tasks.filter(t => t['工作名稱'].toLowerCase().includes(keyword));
+    
+    // 依名稱排序
     tasks.sort((a, b) => a['工作名稱'].localeCompare(b['工作名稱']));
     
-    if (keyword) tasks = tasks.filter(t => t['工作名稱'].toLowerCase().includes(keyword));
-    if (filter !== 'ALL') tasks = tasks.filter(t => (t['預設類別'] || '').includes(filter));
-    
-    if(tasks.length === 0) return tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-slate-400 font-bold">查無資料，請確認篩選條件。</td></tr>';
+    if(tasks.length === 0) return tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-slate-400 font-bold">查無符合條件之工作</td></tr>';
     
     tasks.forEach(t => {
-        // 利用引號處理特殊字元
         const escapedName = t['工作名稱'].replace(/'/g, "\\'");
-        
         tbody.innerHTML += `
             <tr class="border-b hover:bg-slate-50 transition">
+                <td class="p-3 text-slate-500 text-xs">${t['部門名稱'] || ''}</td>
                 <td class="p-3 font-bold text-slate-700">${t['工作名稱']}</td>
                 <td class="p-3 text-blue-700 font-bold">${t['預設類別']}</td>
                 <td class="p-3 flex gap-2">
@@ -83,10 +122,7 @@ function renderTaskList() {
 
 function editTask(taskId, name, category) {
     document.getElementById('editTaskId').value = taskId;
-    
-    // 偷偷藏一個舊名稱，為了讓 GAS 更新時不依賴易變動的 name (如果是舊版沒 ID 的情況)
     document.getElementById('editTaskId').setAttribute('data-oldname', name);
-    
     document.getElementById('newTaskName').value = name;
     document.getElementById('newTaskCat').value = category;
     
@@ -108,18 +144,16 @@ function resetTaskForm() {
 async function saveTask() {
     const taskId = document.getElementById('editTaskId').value;
     const oldName = document.getElementById('editTaskId').getAttribute('data-oldname');
-    const nameInput = document.getElementById('newTaskName');
-    const catInput = document.getElementById('newTaskCat');
-    const taskName = nameInput.value.trim();
-    const category = catInput.value;
+    const taskName = document.getElementById('newTaskName').value.trim();
+    const category = document.getElementById('newTaskCat').value;
+    const deptInput = document.getElementById('taskDeptFilter').value;
     
-    if(!currentDept) return alert("請先於左側選單點擊您要管理的部門！");
+    if(deptInput === 'ALL') return alert("請先於左方篩選器選擇「特定部門」後，再新增/編輯工作！");
     if(!taskName) return alert("請輸入工作名稱！");
     
-    // 防呆：如果是新增，檢查是否重複
     if (!taskId) {
-        const isExist = appData.tasks.find(t => t['部門名稱'] === currentDept && t['工作名稱'] === taskName);
-        if(isExist) return alert("此工作名稱已經存在，請更換名稱。");
+        const isExist = appData.tasks.find(t => t['部門名稱'] === deptInput && t['工作名稱'] === taskName);
+        if(isExist) return alert("此工作名稱已經存在本部門，請更換名稱。");
     }
     
     await postAction({ 
@@ -128,7 +162,7 @@ async function saveTask() {
         oldTaskName: oldName,
         taskName: taskName, 
         category: category, 
-        dept: currentDept 
+        dept: deptInput 
     });
     
     resetTaskForm();
@@ -136,8 +170,11 @@ async function saveTask() {
 }
 
 async function deleteTask(name) {
-    if(confirm(`確定要刪除工作 [${name}] 嗎？`)) {
-        await postAction({ action: 'delete_task', taskName: name, dept: currentDept });
+    const deptInput = document.getElementById('taskDeptFilter').value;
+    if(deptInput === 'ALL') return alert("請先選擇特定部門再進行刪除");
+    
+    if(confirm(`確定要刪除 [${deptInput}] 的工作 [${name}] 嗎？`)) {
+        await postAction({ action: 'delete_task', taskName: name, dept: deptInput });
         showTaskMaint();
     }
 }
