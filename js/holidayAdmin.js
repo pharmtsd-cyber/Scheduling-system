@@ -10,6 +10,7 @@ function openHolidayAdmin() {
 
     const now = new Date();
     document.getElementById('holidayMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    document.getElementById('holidayCatFilter').value = 'ALL'; // 預設顯示全部
 
     renderHolidayGrid();
 }
@@ -17,6 +18,7 @@ function openHolidayAdmin() {
 function renderHolidayGrid() {
     currentHolidayDept = document.getElementById('holidayDeptSelect').value;
     const monthStr = document.getElementById('holidayMonth').value;
+    const catFilter = document.getElementById('holidayCatFilter').value;
     const table = document.getElementById('holidayTable');
     table.innerHTML = '';
 
@@ -25,11 +27,13 @@ function renderHolidayGrid() {
         return;
     }
 
-    const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentHolidayDept || !t['部門名稱']);
     const deptStaff = appData.staff.filter(s => s['所屬組別'] === currentHolidayDept);
     
-    // 找出該月所有排班，以歸納出「每一天」目前指派了哪些工作
-    const monthShifts = appData.shifts.filter(s => s['部門名稱'] === currentHolidayDept && s['日期'].startsWith(monthStr) && s['工作類別'] === '假日');
+    // 找出該月所有排班，並套用類別篩選
+    let monthShifts = appData.shifts.filter(s => s['部門名稱'] === currentHolidayDept && s['日期'].startsWith(monthStr));
+    if (catFilter !== 'ALL') {
+        monthShifts = monthShifts.filter(s => s['工作類別'] === catFilter);
+    }
 
     const [yyyy, mm] = monthStr.split('-');
     const daysInMonth = new Date(yyyy, mm, 0).getDate();
@@ -43,19 +47,18 @@ function renderHolidayGrid() {
         const rowClass = isWeekend ? 'bg-pink-50' : '';
         const dateColor = isWeekend ? 'text-red-500 font-bold' : 'text-slate-700 font-bold';
 
-        // 該日所有已建立的假日工作
         const dailyShifts = monthShifts.filter(s => s['日期'] === dateStr);
 
         tbody += `<tr class="${rowClass} hover:bg-slate-50 transition border-b">`;
         tbody += `<td class="border-r p-2 ${dateColor} align-top w-32 shrink-0">
                     <div>${mm}/${String(d).padStart(2,'0')} (${dayOfWeek})</div>
-                    <button onclick="addHolidayTask('${dateStr}')" class="mt-2 text-[10px] bg-pink-100 text-pink-700 px-2 py-1 rounded shadow hover:bg-pink-200">+ 新增工作</button>
+                    <button onclick="openHolidayTaskModal('${dateStr}')" class="mt-2 text-[10px] bg-pink-100 text-pink-700 px-2 py-1 rounded shadow hover:bg-pink-200">+ 新增工作</button>
                   </td>`;
         
         tbody += `<td class="p-2 flex flex-wrap gap-2">`;
         
         if (dailyShifts.length === 0) {
-            tbody += `<div class="text-slate-400 text-xs mt-2 italic">該日尚無指派工作</div>`;
+            tbody += `<div class="text-slate-400 text-xs mt-2 italic">該日尚無指派工作 (或被篩選器隱藏)</div>`;
         } else {
             dailyShifts.forEach(shift => {
                 let options = '<option value="">--待指派--</option>';
@@ -64,7 +67,7 @@ function renderHolidayGrid() {
                     options += `<option value="${emp['員工編號']}" ${selected}>${emp['姓名']}</option>`;
                 });
 
-                tbody += `<div class="bg-white border border-pink-200 rounded shadow-sm p-2 flex flex-col gap-1 w-40 shrink-0">
+                tbody += `<div class="bg-white border border-pink-200 rounded shadow-sm p-2 flex flex-col gap-1 w-40 shrink-0 relative">
                     <div class="text-xs font-bold text-pink-800 flex justify-between items-center border-b border-pink-100 pb-1 mb-1">
                         <span class="truncate" title="${shift['工作名稱']}">${shift['工作名稱']}</span>
                         <button onclick="deleteHolidayShift('${shift['排班ID']}')" class="text-red-400 hover:text-red-600 font-bold" title="刪除此工作">✖</button>
@@ -73,6 +76,7 @@ function renderHolidayGrid() {
                             onchange="updateHolidayEmp('${shift['排班ID']}', this.value)">
                         ${options}
                     </select>
+                    <div class="text-[9px] text-slate-400 text-right mt-1">${shift['工作類別']}</div>
                 </div>`;
             });
         }
@@ -82,27 +86,63 @@ function renderHolidayGrid() {
     table.innerHTML = tbody;
 }
 
-// 點擊「新增工作」按鈕，彈出視窗請使用者挑選工作清單
-async function addHolidayTask(dateStr) {
-    const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentHolidayDept || !t['部門名稱']);
-    if(deptTasks.length === 0) return alert("該部門尚無任何「工作項目」，請先至清單維護新增。");
-
-    // 建立下拉選單字串供 prompt 使用 (簡單實作，若需美觀可改寫為自訂 Modal)
-    let taskNames = deptTasks.map((t, idx) => `${idx + 1}. ${t['工作名稱']}`).join('\n');
-    let input = prompt(`請輸入要新增的工作「編號」：\n\n${taskNames}`);
+// 開啟新增工作彈窗 (連動類別過濾)
+function openHolidayTaskModal(dateStr) {
+    document.getElementById('hTaskDate').value = dateStr;
+    // 預設選中目前的篩選器類別 (如果是 ALL，就讓使用者自己選，或預設一個)
+    const currentFilter = document.getElementById('holidayCatFilter').value;
+    document.getElementById('hTaskCat').value = currentFilter !== 'ALL' ? currentFilter : '假日班(常規)';
     
-    if (input && !isNaN(input) && input > 0 && input <= deptTasks.length) {
-        const selectedTask = deptTasks[input - 1]['工作名稱'];
-        const shiftId = 'H' + new Date().getTime();
-        
-        await postAction({
-            action: 'save_shift', shiftId, date: dateStr, dept: currentHolidayDept,
-            empId: '', task: selectedTask, start: '08:00', end: '17:00', 
-            category: '假日', remark1: '', remark2: ''
-        });
-        // 不需 reload，因為 postAction 內部已呼叫 reloadData() 並觸發重繪 (但因為在不同頁面，需重新呼叫 renderHolidayGrid)
-        renderHolidayGrid();
+    filterHolidayTaskOptions();
+    document.getElementById('holidayTaskModal').classList.remove('hidden');
+}
+
+// 根據選取的類別，過濾工作清單下拉選單
+function filterHolidayTaskOptions() {
+    const selectedCat = document.getElementById('hTaskCat').value;
+    const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentHolidayDept || !t['部門名稱']);
+    
+    let filteredTasks = deptTasks;
+    if (selectedCat !== 'ALL') {
+        filteredTasks = deptTasks.filter(t => t['預設類別'] === selectedCat);
     }
+    
+    const select = document.getElementById('hTaskSelect');
+    select.innerHTML = '';
+    if(filteredTasks.length === 0) {
+        select.innerHTML = '<option value="">(此類別無可用工作項目)</option>';
+    } else {
+        filteredTasks.forEach(t => {
+            select.innerHTML += `<option value="${t['工作名稱']}">${t['工作名稱']}</option>`;
+        });
+    }
+}
+
+// 儲存行事曆工作
+async function saveHolidayTask() {
+    const dateStr = document.getElementById('hTaskDate').value;
+    const taskName = document.getElementById('hTaskSelect').value;
+    let taskCat = document.getElementById('hTaskCat').value;
+    
+    if(!taskName) return alert('請選擇有效的工作項目，若無項目請先至「工作清單維護」新增。');
+    
+    // 如果類別選了 ALL，就去找這份工作在資料庫的預設類別
+    if (taskCat === 'ALL') {
+        const taskInfo = appData.tasks.find(t => t['工作名稱'] === taskName);
+        taskCat = taskInfo ? taskInfo['預設類別'] : '假日班(常規)';
+    }
+
+    const shiftId = 'H' + new Date().getTime();
+    
+    document.getElementById('holidayTaskModal').classList.add('hidden');
+    
+    await postAction({
+        action: 'save_shift', shiftId, date: dateStr, dept: currentHolidayDept,
+        empId: '', task: taskName, start: '08:00', end: '17:00', 
+        category: taskCat, remark1: '', remark2: ''
+    });
+    
+    renderHolidayGrid();
 }
 
 async function updateHolidayEmp(shiftId, empId) {
@@ -119,7 +159,7 @@ async function updateHolidayEmp(shiftId, empId) {
 }
 
 async function deleteHolidayShift(shiftId) {
-    if(confirm("確定刪除此假日工作指派？")) {
+    if(confirm("確定刪除此工作指派？")) {
         await postAction({ action: 'delete_shift', shiftId: shiftId });
         renderHolidayGrid();
     }
