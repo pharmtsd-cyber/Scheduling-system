@@ -38,8 +38,20 @@
         </div>
     </aside>
 
+    <div id="systemBar" class="fixed top-0 right-0 left-64 bg-white shadow-sm border-b px-6 py-2 flex justify-between items-center z-40">
+        <div class="text-xs text-slate-500 font-bold flex items-center gap-2">
+            👁️ 系統總瀏覽人次：<span id="sysViewCount" class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">0</span>
+        </div>
+        
+        <!-- 草稿未存檔提示區塊 -->
+        <div id="draftStatus" class="hidden flex items-center gap-3">
+            <span class="text-red-500 text-sm font-bold animate-pulse">⚠️ 尚有變更未發佈</span>
+            <button onclick="publishDrafts()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded text-sm font-bold shadow transition">💾 儲存並發佈</button>
+        </div>
+    </div>
+
     <!-- 主內容區 -->
-    <main id="mainContent" class="flex-1 p-6 overflow-y-auto relative w-full">
+    <main id="mainContent" class="flex-1 p-6 pt-12 overflow-y-auto relative w-full">
         <div id="statusToast" class="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg hidden z-50 transition-opacity font-bold">操作成功</div>
         
         <div id="welcomeMsg" class="flex flex-col items-center justify-center h-full text-slate-400">
@@ -107,21 +119,38 @@
         <!-- 維護畫面 -->
         <div id="employeeAdminView" class="hidden">
             <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">🧑‍🤝‍🧑 員工名冊維護</h2>
-            <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">編號</th><th class="p-2">姓名</th><th class="p-2">組別</th><th class="p-2">操作</th></tr></thead><tbody id="empTableBody"></tbody></table></div>
+            <div class="mb-4">
+                <input type="text" id="empSearchInput" onkeyup="renderEmployeeList()" placeholder="🔍 搜尋編號、姓名或組別..." class="w-1/3 border p-2 rounded shadow-sm focus:ring-2 focus:ring-blue-400">
+            </div>
+            <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2 cursor-pointer hover:bg-slate-200">編號 ▼</th><th class="p-2">姓名</th><th class="p-2">組別</th><th class="p-2">操作</th></tr></thead><tbody id="empTableBody"></tbody></table></div>
         </div>
         <div id="taskAdminView" class="hidden">
             <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">📑 工作項目清單</h2>
             <div class="bg-white p-4 rounded shadow mb-4 flex gap-4 items-end border-l-4 border-blue-500">
-                <div><label class="block text-xs font-bold text-slate-500">新工作名稱</label><input type="text" id="newTaskName" class="border p-2 rounded w-48" placeholder="輸入工作名稱"></div>
+                <input type="hidden" id="editTaskId">
+                <div><label class="block text-xs font-bold text-slate-500">工作名稱</label><input type="text" id="newTaskName" class="border p-2 rounded w-48 font-bold text-blue-800" placeholder="輸入工作名稱"></div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500">預設類別</label>
-                    <select id="newTaskCat" class="border p-2 rounded w-40">
+                    <select id="newTaskCat" class="border p-2 rounded w-40 font-bold">
                         <option value="工作日(常規)">工作日(常規)</option><option value="工作日(補充)">工作日(補充)</option><option value="工作日(特殊)">工作日(特殊)</option>
                         <option value="假日班(常規)">假日班(常規)</option><option value="假日班(補充)">假日班(補充)</option><option value="假日班(特殊)">假日班(特殊)</option>
                     </select>
                 </div>
-                <button onclick="addTask()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-blue-700">➕ 新增工作項目</button>
+                <div class="flex gap-2">
+                    <button onclick="saveTask()" id="btnSaveTask" class="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-blue-700">➕ 新增</button>
+                    <button onclick="resetTaskForm()" id="btnCancelTask" class="hidden bg-slate-200 text-slate-700 px-4 py-2 rounded font-bold hover:bg-slate-300">取消編輯</button>
+                </div>
             </div>
+            
+            <div class="flex gap-4 mb-4">
+                <input type="text" id="taskSearchInput" onkeyup="renderTaskList()" placeholder="🔍 搜尋工作名稱..." class="w-1/3 border p-2 rounded shadow-sm">
+                <select id="taskCatFilter" onchange="renderTaskList()" class="border p-2 rounded w-1/4 shadow-sm font-bold text-blue-800">
+                    <option value="ALL">全部類別</option>
+                    <option value="工作日">僅看工作日</option>
+                    <option value="假日班">僅看假日班</option>
+                </select>
+            </div>
+
             <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">工作名稱</th><th class="p-2">預設類別</th><th class="p-2">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
         </div>
     </main>
