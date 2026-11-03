@@ -115,36 +115,49 @@
         </div>
 
         <!-- 管理員排班 (平日模式) -->
-        <div id="adminView" class="hidden">
-            <div class="flex justify-between items-center mb-4 border-b-2 border-blue-200 pb-2">
-                <h2 id="adminTitle" class="text-2xl font-bold text-blue-700"></h2>
-                <button onclick="openHistoryModal()" class="text-sm bg-slate-200 text-slate-700 hover:bg-slate-300 font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow-sm">
-                    🕒 歷史版本與還原
-                </button>
-            </div>
-            
+<!-- 🔄 批次承襲工具列 -->
             <div class="bg-indigo-50 p-4 rounded shadow mb-4 border-l-4 border-indigo-500 relative">
-                <div class="absolute top-2 right-4 text-xs font-bold text-indigo-400">※ 此功能會將該部門整個月的「平日」與「假日」班表一併承襲</div>
-                <div class="flex flex-wrap items-end gap-4 mt-2">
+                <div class="flex items-center gap-4 mb-3 border-b border-indigo-200 pb-2">
+                    <span class="font-bold text-indigo-800">🔄 批次承襲工具：</span>
+                    <label class="cursor-pointer flex items-center gap-1 font-bold text-sm text-slate-700"><input type="radio" name="copyMode" value="day" onchange="toggleCopyMode()" checked> 單日多選承襲</label>
+                    <label class="cursor-pointer flex items-center gap-1 font-bold text-sm text-slate-700"><input type="radio" name="copyMode" value="week" onchange="toggleCopyMode()"> 單週承襲</label>
+                    <label class="cursor-pointer flex items-center gap-1 font-bold text-sm text-slate-700"><input type="radio" name="copyMode" value="month" onchange="toggleCopyMode()"> 整月承襲</label>
+                </div>
+
+                <!-- 單日多選 -->
+                <div id="copyModeDay" class="flex flex-col gap-2">
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div><label class="block text-xs font-bold text-slate-500">來源日期</label><input type="date" id="copySourceDay" class="border p-1 rounded bg-white"></div>
+                        <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
+                        <div><label class="block text-xs font-bold text-slate-500">加入目標日期</label><input type="date" id="copyTargetDayInput" class="border p-1 rounded bg-white"></div>
+                        <button onclick="addTargetDay()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold text-sm shadow-sm">➕ 加入清單</button>
+                        <div class="flex-1"></div>
+                        <button onclick="executeCopyDay()" class="bg-indigo-600 text-white px-4 py-1.5 rounded shadow hover:bg-indigo-700 font-bold">執行單日承襲 (產生草稿)</button>
+                    </div>
+                    <div id="targetDaysContainer" class="flex flex-wrap gap-2 min-h-[34px] p-2 bg-white border border-dashed border-slate-300 rounded items-center">
+                        <span class="text-xs text-slate-400">尚未加入目標日期...</span>
+                    </div>
+                </div>
+
+                <!-- 單週承襲 -->
+                <div id="copyModeWeek" class="hidden flex-wrap items-end gap-4">
+                    <div><label class="block text-xs font-bold text-slate-500">來源週 (起始日)</label><input type="date" id="copySourceWeek" class="border p-1 rounded bg-white"></div>
+                    <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
+                    <div><label class="block text-xs font-bold text-slate-500">目標週 (起始日)</label><input type="date" id="copyTargetWeek" class="border p-1 rounded bg-white"></div>
+                    <div class="text-xs text-indigo-500 font-bold mb-1">※ 系統將自動向後一對一對應 7 天的星期幾</div>
+                    <div class="flex-1"></div>
+                    <button onclick="executeCopyWeek()" class="bg-indigo-600 text-white px-4 py-1.5 rounded shadow hover:bg-indigo-700 font-bold">執行單週承襲 (產生草稿)</button>
+                </div>
+
+                <!-- 整月承襲 (舊有) -->
+                <div id="copyModeMonth" class="hidden flex-wrap items-end gap-4 relative">
+                    <div class="absolute -top-10 right-0 text-xs font-bold text-indigo-500">※ 此功能會將整個月的「平日」與「假日」一併承襲並存入雲端</div>
                     <div><label class="block text-xs font-bold text-slate-500">預覽來源月份</label><input type="month" id="previewMonth" class="border p-1 rounded w-40 bg-white" onchange="renderInteractiveGrid()"></div>
                     <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
                     <div><label class="block text-xs font-bold text-slate-500">目標承襲月份</label><input type="month" id="targetMonth" class="border p-1 rounded w-40 bg-white"></div>
                     <button onclick="copyMonthSchedule()" class="bg-indigo-600 text-white px-6 py-1.5 rounded shadow hover:bg-indigo-700 font-bold">🔄 執行整月承襲套用</button>
                 </div>
             </div>
-
-            <div class="bg-white p-5 rounded shadow">
-                <div class="flex justify-between items-center mb-4">
-                    <div class="flex items-center gap-4">
-                        <input type="date" id="interactiveDate" class="border p-2 rounded shadow-sm text-lg font-bold text-blue-800" onchange="renderInteractiveGrid()">
-                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded">平日排班模式 (以人為主)</span>
-                    </div>
-                    <button onclick="openShiftModal()" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-1">➕ 新增工作</button>
-                </div>
-                <!-- 互動網格 -->
-                <div id="interactiveGrid" class="w-full relative border border-slate-200 rounded overflow-hidden bg-white"></div>
-            </div>
-        </div>
 
 <!-- 維護畫面 -->
         <div id="employeeAdminView" class="hidden">
