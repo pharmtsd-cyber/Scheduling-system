@@ -110,7 +110,12 @@
 
         <!-- 管理員排班 (平日模式) -->
         <div id="adminView" class="hidden">
-            <h2 id="adminTitle" class="text-2xl font-bold mb-4 text-blue-700 border-b-2 border-blue-200 pb-2"></h2>
+            <div class="flex justify-between items-center mb-4 border-b-2 border-blue-200 pb-2">
+                <h2 id="adminTitle" class="text-2xl font-bold text-blue-700"></h2>
+                <button onclick="openHistoryModal()" class="text-sm bg-slate-200 text-slate-700 hover:bg-slate-300 font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow-sm">
+                    🕒 歷史版本與還原
+                </button>
+            </div>
             
             <div class="bg-indigo-50 p-4 rounded shadow mb-4 border-l-4 border-indigo-500 relative">
                 <div class="absolute top-2 right-4 text-xs font-bold text-indigo-400">※ 此功能會將該部門整個月的「平日」與「假日」班表一併承襲</div>
@@ -343,6 +348,48 @@
             
             <div class="mt-4 flex justify-end">
                 <button onclick="document.getElementById('rowActionModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600 hover:bg-slate-100">取消關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 歷史版本與還原 Modal -->
+    <div id="historyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-lg shadow-xl w-[700px] max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b bg-slate-50 flex justify-between items-center rounded-t-lg">
+                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
+                    🕒 <span id="historyModalTitle">版本歷史紀錄</span>
+                </h3>
+                <button onclick="document.getElementById('historyModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 font-bold text-xl">×</button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-4 flex gap-4 bg-slate-100">
+                <!-- 左側：版本清單 -->
+                <div class="w-1/3 bg-white border border-slate-200 rounded shadow-sm overflow-hidden flex flex-col">
+                    <div class="bg-slate-100 text-xs font-bold text-slate-500 p-2 border-b">發佈紀錄 (點擊檢視差異)</div>
+                    <ul id="historyList" class="overflow-y-auto flex-1 p-1 space-y-1"></ul>
+                </div>
+                
+                <!-- 右側：差異比對與還原操作 -->
+                <div class="w-2/3 bg-white border border-slate-200 rounded shadow-sm p-4 flex flex-col">
+                    <div id="historyDetailEmpty" class="flex-1 flex items-center justify-center text-slate-400 font-bold text-sm">
+                        請於左側選擇一個版本
+                    </div>
+                    <div id="historyDetailContent" class="hidden flex-1 flex flex-col">
+                        <div class="mb-3 border-b pb-2">
+                            <div class="text-sm font-bold text-blue-800" id="hdTime"></div>
+                            <div class="text-xs text-slate-500 mt-1">發佈人：<span id="hdAuthor"></span></div>
+                            <div class="text-xs text-slate-500 mt-1">備註：<span id="hdNote" class="text-slate-700 font-bold"></span></div>
+                        </div>
+                        <div class="text-xs font-bold text-slate-600 mb-2">相較於目前畫面班表之差異：</div>
+                        <div id="hdDiffList" class="flex-1 overflow-y-auto bg-slate-50 border p-2 rounded text-xs space-y-2"></div>
+                        
+                        <div class="mt-4 pt-3 border-t flex justify-end">
+                            <button id="btnRestore" onclick="restoreVersion()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-bold shadow flex items-center gap-2">
+                                ⚠️ 捨棄現狀，還原至此版本
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
