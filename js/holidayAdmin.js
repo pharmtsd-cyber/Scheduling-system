@@ -11,9 +11,6 @@ function openHolidayAdmin() {
     const now = new Date();
     document.getElementById('holidayMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    document.getElementById('hTargetMonth').value = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
-    
     document.getElementById('holidayCatFilter').value = 'ALL'; 
 
     renderHolidayGrid();
@@ -132,23 +129,6 @@ function createBatchHolidayTask() {
     }
 }
 
-async function copyHolidayMonth() {
-    const sourceMonth = document.getElementById('holidayMonth').value;
-    const targetMonth = document.getElementById('hTargetMonth').value;
-    
-    if(!sourceMonth || !targetMonth) return alert("請確認已選擇預覽月份與目標月份！");
-    
-    if(confirm(`即將把 [${sourceMonth}] 的行事曆架構完全複製到 [${targetMonth}]，\n包含已經指派的人員也會一併帶入，確定嗎？`)) {
-        await postAction({ action: 'copy_month_template', sourceMonth, targetMonth, deptName: currentHolidayDept });
-        
-        document.getElementById('holidayMonth').value = targetMonth;
-        const [y, m] = targetMonth.split('-');
-        const nextTargetDate = new Date(y, parseInt(m), 1);
-        document.getElementById('hTargetMonth').value = `${nextTargetDate.getFullYear()}-${String(nextTargetDate.getMonth() + 1).padStart(2, '0')}`;
-        
-        renderHolidayGrid();
-    }
-}
 
 function openHolidayTaskModal(dateStr) {
     document.getElementById('hTaskDate').value = dateStr;
