@@ -484,3 +484,18 @@ function executeCopyWeek() {
     document.getElementById('interactiveDate').value = targetWeek;
     renderInteractiveGrid();
 }
+
+// === 捷徑：自動選取本週一 ===
+function setMonday(elementId) {
+    const d = new Date();
+    const day = d.getDay();
+    // 算出距離本週一差幾天 (若為週日 day=0，則往前推 6 天)
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    
+    const yyyy = monday.getFullYear();
+    const mm = String(monday.getMonth() + 1).padStart(2, '0');
+    const dd = String(monday.getDate()).padStart(2, '0');
+    
+    document.getElementById(elementId).value = `${yyyy}-${mm}-${dd}`;
+}
