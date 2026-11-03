@@ -252,11 +252,16 @@ function handleDeptChange(val) {
     }
 }
 
-// 員工屬性修改直接打 API
 async function saveQuickEmpEdit() {
     let endVal = document.getElementById('qEnd').value;
     if(endVal) endVal = endVal.replace('T', ' '); 
     const updateData = { '所屬單位': document.getElementById('qDept').value, '權限': document.getElementById('qAuth').value, '停用時間': endVal, '所屬類別': document.getElementById('qCategory').value, '所屬組別': document.getElementById('qGroup').value };
     document.getElementById('quickEmpModal').classList.add('hidden');
+    
     await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData });
+    
+    // 如果目前畫面停留在員工名冊維護，則自動重繪該清單
+    if (!document.getElementById('employeeAdminView').classList.contains('hidden')) {
+        renderEmployeeList();
+    }
 }
