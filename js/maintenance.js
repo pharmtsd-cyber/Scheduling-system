@@ -52,6 +52,49 @@ function renderEmployeeList() {
     });
 }
 
+// === 補回：員工屬性快速編輯邏輯 ===
+function openQuickEmpEdit(empId) { 
+    const emp = appData.staff.find(e => e['員工編號'] === empId); 
+    if(!emp) return; 
+    document.getElementById('qEmpId').value = empId; 
+    document.getElementById('qEmpName').innerText = emp['姓名']; 
+    document.getElementById('qDept').value = emp['所屬單位'] || '藥學部'; 
+    document.getElementById('qAuth').value = emp['權限'] || ''; 
+    document.getElementById('qStartDisplay').innerText = emp['啟用時間'] || '無紀錄'; 
+    document.getElementById('qStart').value = emp['啟用時間'] || ''; 
+    
+    let endStr = emp['停用時間'] || ''; 
+    if(endStr && !endStr.includes('T')) endStr = endStr.replace(' ', 'T'); 
+    document.getElementById('qEnd').value = endStr; 
+    
+    document.getElementById('qCategory').value = emp['所屬類別'] || ''; 
+    document.getElementById('qGroup').value = emp['所屬組別'] || ''; 
+    document.getElementById('quickEmpModal').classList.remove('hidden'); 
+}
+
+function handleDeptChange(val) { 
+    if(val === '離職') { 
+        const now = new Date(); 
+        document.getElementById('qEnd').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`; 
+    } 
+}
+
+async function saveQuickEmpEdit() { 
+    let endVal = document.getElementById('qEnd').value; 
+    if(endVal) endVal = endVal.replace('T', ' '); 
+    const updateData = { 
+        '所屬單位': document.getElementById('qDept').value, 
+        '權限': document.getElementById('qAuth').value, 
+        '停用時間': endVal, 
+        '所屬類別': document.getElementById('qCategory').value, 
+        '所屬組別': document.getElementById('qGroup').value 
+    }; 
+    document.getElementById('quickEmpModal').classList.add('hidden'); 
+    await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData }); 
+    if (typeof renderEmployeeList === 'function') renderEmployeeList(); 
+}
+
+// === 工作項目清單維護邏輯 ===
 function showTaskMaint() {
     hideAllViews(); 
     document.getElementById('taskAdminView').classList.remove('hidden');
