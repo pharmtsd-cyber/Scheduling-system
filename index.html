@@ -186,98 +186,45 @@
             </div>
         </div>
 
-<!-- 管理員排班 (平日模式) -->
-        <div id="adminView" class="hidden h-full flex flex-col">
-            <!-- 標題與歷史按鈕 -->
-            <div class="flex justify-between items-center mb-4 border-b-2 border-blue-200 pb-2 shrink-0">
-                <h2 id="adminTitle" class="text-2xl font-bold text-blue-700"></h2>
-                <button onclick="openHistoryModal()" class="text-sm bg-slate-200 text-slate-700 hover:bg-slate-300 font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow-sm">
-                    🕒 歷史版本與還原
-                </button>
+        <!-- 平日排班管理與模板專區 (雙模式) -->
+        <div id="adminView" class="hidden flex flex-col h-full">
+            <h2 id="adminTitle" class="text-2xl font-bold text-slate-800 mb-4 border-l-4 border-indigo-600 pl-3"></h2>
+            
+            <!-- 💡 模式切換頁籤 -->
+            <div class="flex gap-2 mb-4 bg-slate-100 p-1 rounded w-fit border border-slate-200">
+                <button id="btnModeDaily" onclick="switchAdminMode('daily')" class="px-6 py-2 rounded font-bold transition shadow bg-white text-blue-700 border border-slate-300">📅 每日排班管理</button>
+                <button id="btnModeTemplate" onclick="switchAdminMode('template')" class="px-6 py-2 rounded font-bold transition text-slate-500 hover:bg-slate-200">🏷️ 模板設計專區</button>
             </div>
-
-<!-- 🏷️ 模板中心 (儲存與套用) -->
-            <div class="bg-indigo-50 p-4 rounded shadow mb-4 border-l-4 border-indigo-500 relative shrink-0">
-                <div class="flex items-center gap-4 mb-3 border-b border-indigo-200 pb-2">
-                    <span class="font-bold text-indigo-800">🏷️ 版本模板中心：</span>
-                    <label class="cursor-pointer flex items-center gap-1 font-bold text-sm text-slate-700"><input type="radio" name="tempMode" value="apply" onchange="toggleTempMode()" checked> 選擇模板套用</label>
-                    <label class="cursor-pointer flex items-center gap-1 font-bold text-sm text-slate-700"><input type="radio" name="tempMode" value="save" onchange="toggleTempMode()"> 將目前畫面存為新模板</label>
-                </div>
-
-                <!-- 模式 A：套用模板 -->
-                <div id="tempModeApply" class="flex flex-col gap-3">
-                    <div class="flex flex-wrap items-end gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500">1. 選擇要套用的模板</label>
-                            <div class="flex gap-2">
-                                <select id="applyTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-indigo-700"></select>
-                                <button onclick="previewSelectedTemplate('weekday')" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded font-bold text-sm shadow-sm hover:bg-indigo-200">🔍 預覽</button>
-                            </div>
-                        </div>
-                        <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500">2. 選擇套用目標</label>
-                            <select id="applyTargetType" onchange="toggleTargetInput()" class="border p-1.5 rounded bg-white font-bold">
-                                <option value="multi-day">特定日期 (多選)</option>
-                                <option value="month-weekday">整個月份的平日 (一~五)</option>
-                            </select>
-                        </div>
-                        
-                        <!-- 選擇器：特定日期 -->
-                        <div id="targetMultiDayInput" class="flex items-end gap-2">
-                            <div><input type="date" id="targetDateVal" class="border p-1.5 rounded bg-white"></div>
-                            <button onclick="addTempTargetDay()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold text-sm shadow-sm">➕ 加入</button>
-                        </div>
-                        
-                        <!-- 選擇器：整個月份 -->
-                        <div id="targetMonthInput" class="hidden items-end gap-2">
-                            <div><input type="month" id="targetMonthVal" class="border p-1.5 rounded bg-white"></div>
-                        </div>
-
-                        <div class="flex-1"></div>
-                        <button onclick="executeApplyTemplate()" class="bg-indigo-600 text-white px-4 py-1.5 rounded shadow hover:bg-indigo-700 font-bold">🚀 執行套用 (產生草稿)</button>
-                    </div>
-                    
-                    <div id="tempTargetDaysContainer" class="flex flex-wrap gap-2 min-h-[34px] p-2 bg-white border border-dashed border-slate-300 rounded items-center">
-                        <span class="text-xs text-slate-400">尚未加入目標日期...</span>
-                    </div>
-                </div>
-
-<!-- 模式 B：存為模板 (支援更新或另存新檔) -->
-                <div id="tempModeSave" class="hidden flex flex-col gap-3">
-                    <div class="text-sm font-bold text-slate-700">
-                        將畫面 <span id="saveTempDateDisplay" class="text-indigo-600"></span> 的排班架構存為模板：
-                    </div>
-                    <div class="flex flex-wrap items-end gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500">更新現有模板 (覆蓋舊版)</label>
-                            <select id="updateTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-blue-700">
-                                <option value="">-- 建立全新模板 (另存) --</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500">或 建立新模板名稱</label>
-                            <input type="text" id="newTempName" class="border p-1.5 rounded bg-white w-64" placeholder="若要另存，請在此輸入新名稱">
-                        </div>
-                        <button onclick="saveCurrentAsTemplate()" class="bg-teal-600 text-white px-6 py-1.5 rounded shadow hover:bg-teal-700 font-bold">💾 執行儲存</button>
-                    </div>
-                </div>
-            </div> <!-- 結束 🏷️ 模板中心 -->
-
-            <!-- 平日排班畫布區塊 -->
-            <div class="flex justify-between items-center mb-2 shrink-0">
+        
+            <!-- 📅 工具列 A：每日排班管理 -->
+            <div id="toolbarDaily" class="flex justify-between items-center mb-2 shrink-0 bg-blue-50/50 p-3 rounded border border-blue-200">
                 <div class="flex items-center gap-4">
-                    <input type="date" id="interactiveDate" class="border p-2 rounded shadow-sm text-lg font-bold text-blue-800" onchange="renderInteractiveGrid()">
-                    <!-- ★ 補回新增工作按鈕，並掛上防呆檢查 -->
-                    <button onclick="guardTemplate(document.getElementById('interactiveDate').value, () => openShiftModal())" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow flex items-center gap-1">
-                        ➕ 新增工作
-                    </button>
-                    <div class="text-sm text-slate-500">支援拖曳人員排序、拖曳工作時段</div>
+                    <input type="date" id="interactiveDate" class="border p-2 rounded shadow-sm text-lg font-bold text-blue-800" onchange="renderUnifiedGrid()">
+                    <button onclick="handleUnifiedAction('add_shift')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow flex items-center gap-1">➕ 新增工作</button>
+                    <div class="h-6 w-px bg-blue-200 mx-1"></div>
+                    <div class="flex items-center gap-2">
+                        <select id="dailyApplyTempSelect" class="border p-1.5 rounded font-bold text-indigo-700 shadow-sm"></select>
+                        <button onclick="executeApplyTemplateToDaily()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded font-bold shadow flex items-center gap-1">📥 套用至本日</button>
+                    </div>
                 </div>
-                <!-- ★ 明確顯示模板狀態與脫鉤按鈕 -->
                 <div id="dailyTemplateStatus" class="flex items-center gap-2"></div>
             </div>
-            <div id="interactiveGrid" class="bg-white rounded shadow flex-1 overflow-y-auto border border-slate-200 min-h-[400px]"></div>
+        
+            <!-- 🏷️ 工具列 B：模板設計專區 -->
+            <div id="toolbarTemplate" class="hidden justify-between items-center mb-2 shrink-0 bg-purple-50/50 p-3 rounded border border-purple-200">
+                <div class="flex items-center gap-4">
+                    <div class="text-sm font-bold text-purple-800 mr-2">編輯模板：</div>
+                    <select id="editTempSelect" class="border p-2 rounded shadow-sm font-bold text-purple-700" onchange="loadTemplateForEdit()">
+                        <option value="new">-- ✨ 建立全新模板 --</option>
+                    </select>
+                    <input type="text" id="editTempName" placeholder="請輸入模板名稱..." class="border p-2 rounded shadow-sm font-bold w-64 text-purple-900 focus:ring-2 focus:ring-purple-400 outline-none">
+                    <button onclick="handleUnifiedAction('add_shift')" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded font-bold shadow flex items-center gap-1">➕ 新增工作</button>
+                </div>
+                <button onclick="saveTemplateFromEditor()" class="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded font-bold shadow flex items-center gap-2">💾 儲存 / 覆蓋模板</button>
+            </div>
+        
+            <!-- 🎨 統一畫布 (動態渲染每日或模板資料) -->
+            <div id="unifiedGrid" class="bg-white rounded shadow flex-1 overflow-y-auto border border-slate-200 min-h-[400px]"></div>
         </div>
 
 <!-- 維護畫面 -->
