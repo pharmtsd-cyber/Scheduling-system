@@ -109,7 +109,10 @@
                     <div class="flex flex-wrap items-end gap-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-500">1. 選擇假日模板</label>
-                            <select id="hApplyTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-pink-700"></select>
+                            <div class="flex gap-2">
+                                <select id="hApplyTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-pink-700"></select>
+                                <button onclick="previewSelectedTemplate('holiday')" class="bg-pink-100 text-pink-700 px-3 py-1.5 rounded font-bold text-sm shadow-sm hover:bg-pink-200">🔍 預覽</button>
+                            </div>
                         </div>
                         <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
                         <div>
@@ -195,7 +198,10 @@
                     <div class="flex flex-wrap items-end gap-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-500">1. 選擇要套用的模板</label>
-                            <select id="applyTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-indigo-700"></select>
+                            <div class="flex gap-2">
+                                <select id="applyTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-indigo-700"></select>
+                                <button onclick="previewSelectedTemplate('weekday')" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded font-bold text-sm shadow-sm hover:bg-indigo-200">🔍 預覽</button>
+                            </div>
                         </div>
                         <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
                         <div>
