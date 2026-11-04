@@ -74,9 +74,9 @@
             <div id="publicBottomRemark" class="bg-yellow-50 text-yellow-800 p-3 rounded-lg mt-3 font-bold hidden border border-yellow-200 shadow-sm flex items-center gap-2"></div>
         </div>
 
-        <!-- 🌟 大統一：排班與模板管理中心 -->
+<!-- 🌟 大統一：排班與模板管理中心 -->
         <div id="adminView" class="hidden flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <div class="flex justify-between items-end mb-4 border-b pb-3">
+            <div class="flex justify-between items-end mb-4 border-b pb-3 shrink-0">
                 <h2 id="adminTitle" class="text-2xl font-bold text-slate-800 border-l-4 border-indigo-600 pl-3"></h2>
                 <div class="flex gap-1 bg-slate-100 p-1.5 rounded-lg border border-slate-200 shadow-inner">
                     <button id="tabDaily" onclick="switchAdminTab('daily')" class="px-6 py-2 rounded font-bold transition shadow-sm bg-white text-blue-700 border border-slate-300">📅 班表總覽與套用</button>
@@ -84,8 +84,8 @@
                 </div>
             </div>
 
-            <!-- 頁籤 A：📅 班表總覽與套用 -->
-            <div id="viewDaily" class="flex flex-col h-full gap-4">
+            <!-- 頁籤 A：📅 班表總覽與套用 (★移除 h-full, 改為 shrink-0) -->
+            <div id="viewDaily" class="flex flex-col shrink-0 gap-4">
                 <div class="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100 flex flex-wrap gap-4 items-end">
                     <div>
                         <label class="block text-xs font-bold text-indigo-700 mb-1">1. 選擇來源模板</label>
@@ -140,8 +140,8 @@
                 </div>
             </div>
 
-            <!-- 頁籤 B：🏷️ 模板設計與維護 -->
-            <div id="viewTemplate" class="hidden flex flex-col h-full gap-4">
+            <!-- 頁籤 B：🏷️ 模板設計與維護 (★移除 h-full, 改為 shrink-0) -->
+            <div id="viewTemplate" class="hidden flex flex-col shrink-0 gap-4">
                 <div class="bg-purple-50 p-4 rounded-lg border border-purple-200 shadow-sm flex flex-wrap items-end gap-4">
                     <div>
                         <label class="block text-xs font-bold text-purple-700 mb-1">編輯現有模板</label>
@@ -169,8 +169,8 @@
                 </div>
             </div>
 
-            <!-- 🎨 大統一畫布 (共用渲染區) -->
-            <div id="unifiedGrid" class="bg-slate-50 rounded-lg shadow-inner flex-1 overflow-auto border-2 border-slate-200 mt-2"></div>
+            <!-- 🎨 大統一畫布 (★補回 min-h-[400px] 確保畫布永遠有高度) -->
+            <div id="unifiedGrid" class="bg-slate-50 rounded-lg shadow-inner flex-1 overflow-auto border-2 border-slate-200 mt-2 min-h-[400px]"></div>
         </div>
 
         <!-- 維護畫面 -->
