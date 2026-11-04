@@ -96,7 +96,6 @@ function handleUnifiedAction(action, dateContext, ...args) {
     const targetDate = currentAdminTab === 'template' ? 'TEMPLATE' : (dateContext || document.getElementById('viewTimelineDate').value);
     
     guardUnifiedAction(targetDate, () => {
-        // ★ 修復：如果有傳入排班ID (args[0])，就帶入給 Modal，讓它識別為編輯模式
         if (action === 'add_shift') { openShiftModal(args[0] || null, targetDate); }
         else if (action === 'update_remarks') {
             const empId = args[0]; const r1 = args[1]; const r2 = args[2];
@@ -131,7 +130,6 @@ function handleUnifiedAction(action, dateContext, ...args) {
                 studioShifts = studioShifts.filter(s => s['排班ID'] !== shiftId);
                 closeShiftModal(); renderUnifiedGrid();
             } else {
-                // ★ 修復：每日排班模式刪除，除了畫面移除外，同步觸發雲端刪除，確保不會重生
                 if(confirm("確定要刪除此工作嗎？(刪除將立即寫入雲端)")) {
                     appData.shifts = appData.shifts.filter(s => s['排班ID'] !== shiftId);
                     fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_shift', shiftId: shiftId }) }).catch(e=>console.error(e));
@@ -321,6 +319,8 @@ function renderTimelineView() {
             `<span class="text-blue-800 font-bold w-full text-center tracking-wide">${emp['姓名']}</span>`;
 
         let dragProps = isDummy ? '' : `draggable="true" ondragstart="dragRow(event, '${emp.rowId}')" ondragover="allowDrop(event)" ondrop="dropRow(event, '${emp.rowId}')"`;
+        
+        // ★ 修復：判斷有拷貝資料時，才顯示貼上按鈕
         let pasteBtnHtml = (clipboardShift && !isDummy) ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[10px] bg-indigo-600 text-white px-2 py-0.5 mt-1 rounded shadow-md hover:bg-indigo-700 transition absolute bottom-0.5 z-20">📋 貼上</button>` : '';
 
         let overlapIds = new Set();
@@ -357,9 +357,13 @@ function renderTimelineView() {
             let shiftBg = isOverlapping ? 'bg-red-100 border-2 border-red-500 animate-pulse shadow-md z-30' : (isDummy ? 'bg-amber-100 border-2 border-dashed border-amber-500 hover:bg-amber-200 shadow-md' : 'bg-blue-100 border border-blue-400 hover:bg-blue-200 shadow-sm');
             let textColor = isOverlapping ? 'text-red-900' : (isDummy ? 'text-amber-900' : 'text-blue-900');
 
-            res += `<div class="absolute top-[6px] bottom-[6px] ${shiftBg} rounded-md flex flex-col justify-center items-center cursor-grab active:cursor-grabbing transition overflow-visible z-10" draggable="true" ondragstart="dragShift(event, '${shift['排班ID']}')" onclick="handleUnifiedAction('add_shift', '${targetDate}', '${shift['排班ID']}')" style="left:${left}%; width:${width}%;">
+            // ★ 修復：加上了 Hover 才會顯示的獨立複製小圖示
+            res += `<div class="absolute top-[6px] bottom-[6px] ${shiftBg} rounded-md flex flex-col justify-center items-center cursor-grab active:cursor-grabbing transition overflow-visible z-10 group/shift" draggable="true" ondragstart="dragShift(event, '${shift['排班ID']}')" onclick="handleUnifiedAction('add_shift', '${targetDate}', '${shift['排班ID']}')" style="left:${left}%; width:${width}%;">
                 <div class="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-black/5 hover:bg-black/30 z-20 rounded-l-md transition" onmousedown="initResize(event, '${shift['排班ID']}', 'start')"></div>
                 <div class="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-black/5 hover:bg-black/30 z-20 rounded-r-md transition" onmousedown="initResize(event, '${shift['排班ID']}', 'end')"></div>
+                
+                <button onclick="copyShift(event, '${shift['排班ID']}')" class="absolute top-0 right-0.5 text-[9px] opacity-0 group-hover/shift:opacity-100 hover:scale-125 transition z-30 drop-shadow" title="複製此工作">📋</button>
+                
                 <div class="font-bold ${textColor} text-xs truncate w-full text-center px-2 pointer-events-none">${isOverlapping ? '⚠️ ' : ''}${shift['工作名稱']}</div>
                 <div class="text-[10px] ${textColor} font-bold mt-[1px] opacity-80 pointer-events-none">${shift['開始時間']} - ${shift['結束時間']}</div>
             </div>`;
@@ -434,7 +438,7 @@ function updateModalEmp(empId) { document.getElementById('modalEmp').value = emp
 function openShiftModal(shiftId = null, targetDate = null) {
     modalTargetDate = targetDate || getActiveContextDate();
     const modal = document.getElementById('shiftModal');
-    const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentDept || !t['部門名稱']);
+    const deptTasks = appData.tasks.filter(t => (t['部門名稱'] === currentDept || !t['部門名稱']) && t['狀態'] !== '停用');
     
     let selectedEmpId = shiftId ? (getActiveShifts(modalTargetDate).find(s => s['排班ID'] === shiftId)?.['員工編號'] || '') : '';
     updateModalEmp(selectedEmpId);
@@ -458,17 +462,43 @@ function saveShift() {
 }
 function deleteShift() { handleUnifiedAction('delete_shift', modalTargetDate, document.getElementById('modalShiftId').value); }
 
+// ★ 修復：透過按鈕複製，不再綁定拖拉事件
+function copyShift(ev, shiftId) {
+    ev.stopPropagation(); // 阻止氣泡傳遞，避免打開 Modal
+    const targetDate = getActiveContextDate();
+    clipboardShift = getActiveShifts(targetDate).find(s => s['排班ID'] === shiftId);
+    showToast("✅ 工作已複製，請在人員名稱下方點擊貼上");
+    renderUnifiedGrid(); // 重新渲染以顯示貼上按鈕
+}
+
+// ★ 修復：精確指派複製來的資料，並將剪貼簿清空(一次性使用)
 function pasteShift(empId) { 
     if (!clipboardShift) return; 
     const targetDate = getActiveContextDate();
-    const newShift = { ...clipboardShift, shiftId: 'S' + new Date().getTime(), empId: empId, date: targetDate };
-    updateActiveShift(newShift); 
-    showToast("✅ 已貼上工作"); renderUnifiedGrid(); 
+    
+    // 將 DB 資料格式轉換為 markDraft 支援的英文字段
+    const shiftData = { 
+        shiftId: 'S' + new Date().getTime(), 
+        date: targetDate, 
+        dept: currentDept, 
+        empId: empId, 
+        task: clipboardShift['工作名稱'], 
+        start: clipboardShift['開始時間'], 
+        end: clipboardShift['結束時間'], 
+        category: clipboardShift['工作類別'], 
+        remark1: clipboardShift['備註'], 
+        remark2: clipboardShift['備註2'] 
+    };
+    
+    updateActiveShift(shiftData); 
+    clipboardShift = null; // 一次性使用
+    showToast("✅ 已成功貼上工作"); 
+    renderUnifiedGrid(); 
 }
 
 function allowDrop(ev) { ev.preventDefault(); }
 function dragRow(ev, rowId) { ev.dataTransfer.setData("rowEmpId", rowId); }
-function dragShift(ev, shiftId) { ev.dataTransfer.setData("shiftId", shiftId); ev.stopPropagation(); clipboardShift = getActiveShifts(getActiveContextDate()).find(s => s['排班ID'] === shiftId); showToast("✅ 工作已自動複製，可點擊他人直接貼上"); }
+function dragShift(ev, shiftId) { ev.dataTransfer.setData("shiftId", shiftId); ev.stopPropagation(); }
 function dropRow(ev, targetRowId) { 
     ev.preventDefault(); ev.stopPropagation(); const sourceRowId = ev.dataTransfer.getData("rowEmpId"); 
     if (sourceRowId && sourceRowId !== targetRowId) { 
