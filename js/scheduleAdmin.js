@@ -349,7 +349,22 @@ function previewSelectedTemplate(type) {
 
 function updateShiftEmp(shiftId, newEmpId) {
     const shift = appData.shifts.find(s => s['排班ID'] === shiftId);
-    if (shift) { markDraft({ ...shift, empId: newEmpId }); renderInteractiveGrid(); }
+    if (shift) {
+        // 明確將原始資料的中文欄位轉換為 markDraft 需要的英文欄位
+        markDraft({
+            shiftId: shift['排班ID'],
+            date: shift['日期'],
+            dept: shift['部門名稱'],
+            empId: newEmpId, // 這是新的指派人員
+            task: shift['工作名稱'],
+            start: shift['開始時間'],
+            end: shift['結束時間'],
+            category: shift['工作類別'],
+            remark1: shift['備註'],
+            remark2: shift['備註2']
+        });
+        renderInteractiveGrid();
+    }
 }
 
 function updateModalEmp(empId) {
