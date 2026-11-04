@@ -81,17 +81,21 @@ function renderHolidayGrid() {
             tbody += `<div class="text-slate-400 text-xs mt-2 italic">該日尚無指派工作</div>`;
         } else {
             dailyShifts.forEach(shift => {
-                // ★ 這裡直接吃 buildEmpSelectOptions 動態產生出來的「未指派」與全院人員！
-                const optionsHTML = typeof buildEmpSelectOptions === 'function' ? buildEmpSelectOptions(deptStaffMap, shift['員工編號']) : '';
+                // ★ 這裡使用按鈕呼叫 openStaffPicker，完全淘汰舊有的 Select
+                let empNameDisplay = shift['員工編號'] ? (appData.staff.find(e => e['員工編號'] === shift['員工編號'])?.['姓名'] || shift['員工編號']) : '-- ⚠️ 待指派 --';
+                let btnClass = shift['員工編號'] ? 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100' : 'text-orange-700 bg-orange-50 border-orange-300 animate-pulse hover:bg-orange-100 shadow-inner';
+                
                 tbody += `<div class="bg-white border border-pink-200 rounded shadow-sm p-2 flex flex-col gap-1 w-40 shrink-0 relative hover:border-pink-300 transition">
                     <div class="text-xs font-bold text-pink-800 flex justify-between items-center border-b border-pink-100 pb-1 mb-1">
                         <span class="truncate" title="${shift['工作名稱']}">${shift['工作名稱']}</span>
                         <button onclick="guardHolidayTemplate('${dateStr}', () => deleteHolidayShift('${shift['排班ID']}'))" class="text-red-400 hover:text-red-600 font-bold" title="刪除此工作">✖</button>
                     </div>
-                    <select class="w-full border p-1 rounded text-xs text-slate-700 focus:ring-1 focus:ring-pink-400 font-bold"
-                            onchange="guardHolidayTemplate('${dateStr}', () => updateHolidayEmp('${shift['排班ID']}', this.value))">
-                        ${optionsHTML}
-                    </select>
+                    
+                    <button onclick="guardHolidayTemplate('${dateStr}', () => openStaffPicker('${shift['員工編號']}', currentHolidayDept, (newEmp) => updateHolidayEmp('${shift['排班ID']}', newEmp)))"
+                            class="w-full border p-1 rounded text-xs focus:ring-1 focus:ring-pink-400 font-bold text-left flex justify-between items-center transition ${btnClass}">
+                        <span>${empNameDisplay}</span> <span class="text-[10px] text-slate-400">🔍</span>
+                    </button>
+                    
                     <div class="text-[9px] text-slate-400 text-right mt-1">${shift['工作類別']}</div>
                 </div>`;
             });
