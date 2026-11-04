@@ -7,11 +7,15 @@ function openAdminDept(deptName) {
     document.getElementById('adminView').classList.remove('hidden');
     document.getElementById('adminTitle').innerText = `✏️ 平日排班：${deptName}`;
     
-    // ★ 載入之前記住的人員排序
-    try {
-        const savedOrder = localStorage.getItem('staffOrder_' + currentDept);
-        if (savedOrder) customStaffOrder = JSON.parse(savedOrder);
-    } catch(e) {}
+    // ★ 改為從雲端資料庫載入排序，取代 LocalStorage
+    customStaffOrder = [];
+    if (appData.depts && appData.depts.length > 0) {
+        // 尋找對應的部門資料 (支援不同表頭命名習慣)
+        const deptInfo = appData.depts.find(d => Object.values(d)[0] === deptName || d['部門名稱'] === deptName);
+        if (deptInfo && deptInfo['人員排序']) {
+            try { customStaffOrder = JSON.parse(deptInfo['人員排序']); } catch(e) { console.error("排序解析失敗", e); }
+        }
+    }
     
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -289,7 +293,6 @@ function saveShift() {
     }); 
 }
 
-// === 持久化排序 ===
 function dropRow(ev, targetRowId) { 
     ev.preventDefault(); ev.stopPropagation(); 
     const sourceRowId = ev.dataTransfer.getData("rowEmpId"); 
@@ -317,7 +320,17 @@ function dropRow(ev, targetRowId) {
             currentOrder.splice(sourceIdx, 1); 
             currentOrder.splice(targetIdx, 0, sourceRowId); 
             customStaffOrder = currentOrder; 
-            localStorage.setItem('staffOrder_' + currentDept, JSON.stringify(customStaffOrder)); // 寫入瀏覽器快取
+            
+            // ★ 取代 localStorage，改為背景非同步寫入雲端
+            fetch(GAS_URL, { 
+                method: 'POST', 
+                body: JSON.stringify({ action: 'update_staff_order', deptName: currentDept, order: customStaffOrder }) 
+            }).catch(e => console.error("排序上傳失敗", e));
+            
+            // 同步更新本地 appData 暫存，避免重整前切換日期排序跑掉
+            const deptInfo = appData.depts.find(d => Object.values(d)[0] === currentDept || d['部門名稱'] === currentDept);
+            if (deptInfo) deptInfo['人員排序'] = JSON.stringify(customStaffOrder);
+            
             renderInteractiveGrid(); 
         } 
     } 
