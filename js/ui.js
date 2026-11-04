@@ -6,9 +6,10 @@ function showToast(msg = "已儲存") {
 }
 
 function hideAllViews() {
+    // ★ 移除了 holidayAdminView，並加入 el 安全判斷避免找不到元素時當機
     ['welcomeMsg', 'publicView', 'adminView', 'employeeAdminView', 'taskAdminView'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.classList.add('hidden'); // 加入安全判斷，避免未來找不到元素時當機
+        if (el) el.classList.add('hidden');
     });
 }
 
@@ -17,7 +18,6 @@ function renderPublicSidebar() {
     list.innerHTML = '';
     appData.depts.forEach(d => list.innerHTML += `<li class="cursor-pointer p-2 hover:bg-slate-700 rounded transition font-bold" onclick="openPublicDept('${d['部門名稱']}')">🏥 ${d['部門名稱']}</li>`);
 }
-
 
 // ==========================================
 // 🔍 全域人員模糊搜尋器邏輯
@@ -31,7 +31,6 @@ function openStaffPicker(currentEmpId, contextDept, callback) {
     document.getElementById('staffPickerSearch').value = '';
     document.getElementById('staffPickerModal').classList.remove('hidden');
     renderStaffPickerList();
-    // 延遲聚焦以確保 Modal 已渲染
     setTimeout(() => document.getElementById('staffPickerSearch').focus(), 100);
 }
 
@@ -46,7 +45,6 @@ function renderStaffPickerList() {
     const list = document.getElementById('staffPickerList');
     let html = '';
     
-    // 永遠提供「未指派」選項
     if (!query || "未指派".includes(query)) {
         html += `<li onclick="selectStaffPicker('')" class="cursor-pointer p-2 rounded bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold border border-orange-200 mb-2 shadow-sm flex items-center gap-2">
             ⚠️ 設為待指派 (留空)
@@ -59,7 +57,6 @@ function renderStaffPickerList() {
         staffArr = staffArr.filter(s => (s['姓名']||'').toLowerCase().includes(query) || (s['員工編號']||'').toLowerCase().includes(query) || (s['所屬組別']||'').toLowerCase().includes(query));
     }
     
-    // 排序：同部門優先
     staffArr.sort((a, b) => {
         const aIsDept = a['所屬組別'] === staffPickerContextDept;
         const bIsDept = b['所屬組別'] === staffPickerContextDept;
