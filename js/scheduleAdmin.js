@@ -3,6 +3,7 @@ let currentViewMode = 'timeline';
 let studioShifts = []; 
 let engineSpecificDates = []; 
 let clipboardShift = null; 
+let dragShiftState = null; // ★ 新增：紀錄拖拉時的游標位置，用來精準定位放開的時間
 
 function openAdminDept(deptName) {
     currentDept = deptName;
@@ -124,6 +125,12 @@ function handleUnifiedAction(action, dateContext, ...args) {
             const shift = getActiveShifts(targetDate).find(s => s['排班ID'] === shiftId);
             if (shift) { updateActiveShift({ shiftId: shift['排班ID'], date: targetDate, dept: currentDept, empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); renderUnifiedGrid(); }
         }
+        else if (action === 'move_shift_time_emp') {
+            // ★ 新增：處理拖曳丟下時，同時變更人員與時段的路由
+            const shiftId = args[0]; const newEmpId = args[1]; const newStart = args[2]; const newEnd = args[3];
+            const shift = getActiveShifts(targetDate).find(s => s['排班ID'] === shiftId);
+            if (shift) { updateActiveShift({ shiftId: shift['排班ID'], date: targetDate, dept: currentDept, empId: newEmpId, task: shift['工作名稱'], start: newStart, end: newEnd, category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); renderUnifiedGrid(); }
+        }
         else if (action === 'delete_shift') {
             const shiftId = args[0];
             if (currentAdminTab === 'template') {
@@ -225,14 +232,16 @@ function executeAdvancedApply() {
     renderUnifiedGrid();
 }
 
-// === 拖曳縮放時間引擎 (Drag-to-Resize) ===
-let resizeState = null;
+// === 時間軸座標運算引擎 ===
 function timeToMins(t) { const [h,m] = (t||'08:00').split(':').map(Number); return h*60+m; }
 function minsToTime(m) { 
     let h = Math.floor(m/60); let min = Math.floor(m%60); 
     if(h<8) h=8; if(h>=22 && min>0) {h=22; min=0;} 
     return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
 }
+
+// --- 邊緣縮放邏輯 (Resize) ---
+let resizeState = null;
 function initResize(e, shiftId, edge) {
     e.stopPropagation(); e.preventDefault();
     const targetDate = getActiveContextDate();
@@ -322,6 +331,7 @@ function renderTimelineView() {
         
         let pasteBtnHtml = (clipboardShift && !isDummy) ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[10px] bg-indigo-600 text-white px-2 py-0.5 mt-1 rounded shadow-md hover:bg-indigo-700 transition absolute bottom-0.5 z-20">📋 貼上</button>` : '';
 
+        // ★ 智慧防呆衝突偵測
         let overlapIds = new Set();
         if (!isDummy) {
             for(let i=0; i<myShifts.length; i++){
@@ -333,6 +343,7 @@ function renderTimelineView() {
             }
         }
 
+        // ★ 拖曳丟下事件改綁 dropShiftOnTimeline
         let res = `<div class="flex timeline-container group transition ${rowClass} h-[60px]">
             <div class="w-24 p-1 border-r ${isDummy ? 'bg-amber-100/50 border-r-amber-300' : 'border-r-slate-200'} flex flex-col items-center justify-center shadow-sm z-10 relative ${isDummy?'':'cursor-ns-resize'} shrink-0" ${dragProps}>
                 <div class="absolute top-0 left-0 bg-slate-300/80 text-slate-700 text-[9px] px-1.5 py-0.5 rounded-br-lg shadow-sm font-bold z-20">${isDummy ? '池' : (index + 1)}</div>
@@ -342,7 +353,7 @@ function renderTimelineView() {
             <div class="w-32 border-r ${isDummy ? 'bg-amber-50/50 border-r-amber-300' : 'bg-transparent border-r-slate-200'} flex items-center p-1.5 shrink-0">
                 <input type="text" class="w-full h-full text-xs p-1.5 border-transparent focus:ring-2 focus:ring-blue-400 rounded-md bg-white/50 focus:bg-white text-blue-900 font-bold shadow-inner transition outline-none" placeholder="備註..." value="${r1}" onblur="handleUnifiedAction('update_remarks', '${targetDate}', '${emp['員工編號']}', this.value, null)">
             </div>
-            <div class="flex-1 relative drop-zone" ondragover="allowDrop(event)" ondrop="handleUnifiedAction('move_shift_emp', '${targetDate}', event.dataTransfer.getData('shiftId'), '${emp['員工編號']}')">
+            <div class="flex-1 relative drop-zone" ondragover="allowDrop(event)" ondrop="dropShiftOnTimeline(event, '${targetDate}', '${emp['員工編號']}')">
                 <div class="absolute inset-0 flex pointer-events-none opacity-20">`;
         for(let i=8; i<=21; i++) res += `<div class="flex-1 border-l border-slate-400"></div><div class="flex-1 border-l border-dashed border-slate-400"></div>`;
         res += `</div>`;
@@ -356,7 +367,6 @@ function renderTimelineView() {
             let shiftBg = isOverlapping ? 'bg-red-100 border-2 border-red-500 animate-pulse shadow-md z-30' : (isDummy ? 'bg-amber-100 border-2 border-dashed border-amber-500 hover:bg-amber-200 shadow-md' : 'bg-blue-100 border border-blue-400 hover:bg-blue-200 shadow-sm');
             let textColor = isOverlapping ? 'text-red-900' : (isDummy ? 'text-amber-900' : 'text-blue-900');
 
-            // ★ 放大複製按鈕並加強視覺效果
             res += `<div class="absolute top-[6px] bottom-[6px] ${shiftBg} rounded-md flex flex-col justify-center items-center cursor-grab active:cursor-grabbing transition overflow-visible z-10 group/shift" draggable="true" ondragstart="dragShift(event, '${shift['排班ID']}')" onclick="handleUnifiedAction('add_shift', '${targetDate}', '${shift['排班ID']}')" style="left:${left}%; width:${width}%;">
                 <div class="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-black/5 hover:bg-black/30 z-20 rounded-l-md transition" onmousedown="initResize(event, '${shift['排班ID']}', 'start')"></div>
                 <div class="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-black/5 hover:bg-black/30 z-20 rounded-r-md transition" onmousedown="initResize(event, '${shift['排班ID']}', 'end')"></div>
@@ -373,7 +383,7 @@ function renderTimelineView() {
 
     if (poolRows.length > 0) {
         html += `<div class="bg-indigo-100/80 text-indigo-900 font-bold p-2 text-sm border-y border-indigo-300 shadow-sm flex items-center justify-between sticky top-[80px] z-20 backdrop-blur">
-            <span>📥 待指派工作池 (請將右側黃色方塊，拖拉丟入下方人員列)</span>
+            <span>📥 待指派工作池 (請將右側黃色方塊，直接按住拖拉到下方人員的時間軸上)</span>
         </div>`;
         poolRows.forEach((emp, i) => html += generateRowHtml(emp, i, true));
     }
@@ -490,9 +500,51 @@ function pasteShift(empId) {
     renderUnifiedGrid(); 
 }
 
+// ★ 拖拉動作觸發點：紀錄滑鼠與方塊的相對距離，並關閉自動複製
+function dragShift(ev, shiftId) { 
+    ev.dataTransfer.setData("shiftId", shiftId); 
+    ev.stopPropagation(); 
+    const rect = ev.target.getBoundingClientRect();
+    dragShiftState = { offsetX: ev.clientX - rect.left };
+}
+
 function allowDrop(ev) { ev.preventDefault(); }
 function dragRow(ev, rowId) { ev.dataTransfer.setData("rowEmpId", rowId); }
-function dragShift(ev, shiftId) { ev.dataTransfer.setData("shiftId", shiftId); ev.stopPropagation(); clipboardShift = getActiveShifts(getActiveContextDate()).find(s => s['排班ID'] === shiftId); showToast("✅ 工作已自動複製，可點擊他人直接貼上"); }
+
+// ★ 拖拉丟下點：計算座標並更新時段與人員
+function dropShiftOnTimeline(ev, targetDate, targetEmpId) {
+    ev.preventDefault();
+    const shiftId = ev.dataTransfer.getData("shiftId");
+    if (!shiftId) return; 
+
+    const zoneRect = ev.currentTarget.getBoundingClientRect();
+    const dropX = ev.clientX - zoneRect.left;
+    const offsetX = dragShiftState ? dragShiftState.offsetX : 0;
+    let shiftLeft = dropX - offsetX; // 精準扣除滑鼠原本點擊在方塊上的偏移量
+    
+    const percentage = shiftLeft / zoneRect.width;
+    let newStartMins = 8 * 60 + Math.round((percentage * 840) / 15) * 15;
+    
+    const shift = getActiveShifts(targetDate).find(s => s['排班ID'] === shiftId);
+    if (!shift) return;
+    
+    const duration = timeToMins(shift['結束時間']) - timeToMins(shift['開始時間']);
+    
+    if (newStartMins < 8 * 60) newStartMins = 8 * 60;
+    let newEndMins = newStartMins + duration;
+    
+    if (newEndMins > 22 * 60) {
+        newEndMins = 22 * 60;
+        newStartMins = newEndMins - duration;
+    }
+    
+    const newStart = minsToTime(newStartMins);
+    const newEnd = minsToTime(newEndMins);
+    
+    handleUnifiedAction('move_shift_time_emp', targetDate, shiftId, targetEmpId, newStart, newEnd);
+    dragShiftState = null;
+}
+
 function dropRow(ev, targetRowId) { 
     ev.preventDefault(); ev.stopPropagation(); const sourceRowId = ev.dataTransfer.getData("rowEmpId"); 
     if (sourceRowId && sourceRowId !== targetRowId) { 
