@@ -386,3 +386,59 @@ async function saveQuickEmpEdit() {
     await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData });
     if (!document.getElementById('employeeAdminView').classList.contains('hidden') && typeof renderEmployeeList === 'function') renderEmployeeList();
 }
+
+// ==========================================
+// 🔍 模板預覽邏輯 (平日/假日共用)
+// ==========================================
+function previewSelectedTemplate(type) {
+    const selectId = type === 'weekday' ? 'applyTempSelect' : 'hApplyTempSelect';
+    const tempId = document.getElementById(selectId).value;
+    
+    if (!tempId) return alert('請先選擇一個模板');
+
+    const template = appData.templates.find(t => t['模板ID'] === tempId);
+    if (!template) return;
+
+    document.getElementById('tpModalTitle').innerText = template['模板名稱'];
+    let shifts = [];
+    try { shifts = JSON.parse(template['排班快照']); } catch(e) {}
+
+    let html = '';
+    if (shifts.length === 0) {
+        html = '<div class="text-slate-500 text-center italic mt-4 font-bold">此模板無任何排班內容。</div>';
+    } else {
+        // 將快照內的班表按「人員」進行群組化，方便閱讀
+        const empMap = new Map();
+        shifts.forEach(s => {
+            if (s['員工編號'].startsWith('SYS_')) return; // 略過系統備註與綁定標籤
+            if (!empMap.has(s['員工編號'])) empMap.set(s['員工編號'], []);
+            empMap.get(s['員工編號']).push(s);
+        });
+
+        if(empMap.size === 0) {
+             html = '<div class="text-slate-500 text-center italic mt-4 font-bold">此模板僅包含系統備註，無人員班表。</div>';
+        } else {
+            const themeColor = type === 'weekday' ? 'blue' : 'pink';
+            empMap.forEach((empShifts, empId) => {
+                const empName = appData.staff.find(e => e['員工編號'] === empId)?.['姓名'] || (empId === '' ? '未指派 (待補人)' : empId);
+                
+                html += `<div class="bg-white border p-3 rounded shadow-sm">
+                    <div class="font-bold text-${themeColor}-800 border-b border-${themeColor}-100 pb-1 mb-2">${empName}</div>`;
+                
+                empShifts.forEach(s => {
+                    html += `<div class="text-sm text-slate-700 flex justify-between ml-2 mt-1">
+                        <span class="font-bold">🔹 [${s['工作名稱']}]</span>
+                        <span class="text-slate-500 text-xs">${s['開始時間']} - ${s['結束時間']}</span>
+                    </div>`;
+                    if(s['備註'] || s['備註2']) {
+                        html += `<div class="text-xs text-slate-400 ml-6 mt-0.5">↳ ${s['備註']} ${s['備註2']}</div>`;
+                    }
+                });
+                html += `</div>`;
+            });
+        }
+    }
+
+    document.getElementById('tpContent').innerHTML = html;
+    document.getElementById('templatePreviewModal').classList.remove('hidden');
+}
