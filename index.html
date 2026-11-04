@@ -194,18 +194,48 @@
         </div>
 
         <div id="taskAdminView" class="hidden">
-            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2 text-slate-800">📑 工作項目維護</h2>
-            <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-4 flex gap-4 items-end bg-indigo-50/30">
+            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2 text-slate-800 flex items-center gap-3">
+                📑 工作項目維護 
+                <span id="taskListCount" class="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full font-bold shadow-sm">共 0 項</span>
+            </h2>
+            
+            <div class="flex flex-wrap gap-4 mb-4 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">部門</label>
+                    <select id="taskDeptFilter" onchange="renderTaskList()" class="border p-2 rounded w-32 font-bold text-indigo-700 outline-none"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">類別篩選</label>
+                    <select id="taskCatFilter" onchange="renderTaskList()" class="border p-2 rounded w-32 font-bold text-slate-700 outline-none"></select>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">模糊搜尋</label>
+                    <input type="text" id="taskSearchInput" onkeyup="renderTaskList()" placeholder="🔍 搜尋工作名稱..." class="w-full border p-2 rounded shadow-sm focus:ring-2 focus:ring-indigo-400 font-bold outline-none">
+                </div>
+            </div>
+
+            <div class="bg-indigo-50/50 p-4 rounded-lg shadow-sm border border-indigo-100 mb-4 flex flex-wrap gap-4 items-end">
                 <input type="hidden" id="editTaskId">
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">部門</label><select id="taskDeptFilter" class="border p-2 rounded w-32 font-bold text-indigo-700"></select></div>
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">工作名稱</label><input type="text" id="newTaskName" class="border p-2 rounded w-48 font-bold text-slate-800 placeholder-slate-400" placeholder="輸入名稱..."></div>
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">預設類別</label><select id="newTaskCat" class="border p-2 rounded w-36 font-bold text-slate-700"><option value="常規">常規</option><option value="特殊">特殊</option></select></div>
+                <div><label class="block text-xs font-bold text-indigo-700 mb-1">部門</label><select id="newTaskDept" class="border p-2 rounded w-32 font-bold text-slate-700"></select></div>
+                <div><label class="block text-xs font-bold text-indigo-700 mb-1">工作名稱</label><input type="text" id="newTaskName" class="border p-2 rounded w-48 font-bold text-slate-800 placeholder-slate-400" placeholder="輸入名稱..."></div>
+                <div>
+                    <label class="block text-xs font-bold text-indigo-700 mb-1">自訂或選擇類別</label>
+                    <input type="text" id="newTaskCat" class="border p-2 rounded w-36 font-bold text-slate-700" placeholder="打字建立或下拉" list="dynamicCatList">
+                    <datalist id="dynamicCatList"></datalist>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-indigo-700 mb-1">狀態</label>
+                    <select id="newTaskStatus" class="border p-2 rounded w-24 font-bold text-slate-700"><option value="啟用">✅ 啟用</option><option value="停用">❌ 停用</option></select>
+                </div>
                 <div class="flex gap-2">
-                    <button onclick="saveTask()" id="btnSaveTask" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-bold shadow-sm transition">➕ 新增 / 儲存</button>
+                    <button onclick="saveTask()" id="btnSaveTask" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded font-bold shadow-sm transition">➕ 新增 / 儲存</button>
                     <button onclick="resetTaskForm()" id="btnCancelTask" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded font-bold transition">取消</button>
                 </div>
             </div>
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100 border-b"><tr><th class="p-3">部門</th><th class="p-3">工作名稱</th><th class="p-3">預設類別</th><th class="p-3 text-center">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
+            
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <table class="min-w-full text-sm text-left"><thead class="bg-slate-100 border-b"><tr><th class="p-3">狀態</th><th class="p-3">部門</th><th class="p-3">工作名稱</th><th class="p-3">類別</th><th class="p-3 text-center">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table>
+            </div>
         </div>
     </main>
 
