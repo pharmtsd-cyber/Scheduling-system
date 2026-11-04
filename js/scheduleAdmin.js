@@ -17,7 +17,6 @@ function openAdminDept(deptName) {
     renderInteractiveGrid();
 }
 
-// 取得該部門該月份應顯示的「混合員工名單」
 function getMixedDeptStaff(monthStr) {
     const monthShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr));
     const monthEmpIds = new Set(monthShifts.map(s => s['員工編號']));
@@ -29,10 +28,15 @@ function getMixedDeptStaff(monthStr) {
         }
     });
     deptStaffMap.delete('SYS_REMARK'); 
-    deptStaffMap.delete('SYS_TEMPLATE'); // 排除系統模板關聯帳號
+    deptStaffMap.delete('SYS_TEMPLATE');
+    
+    // ★ 核心：強制加入一個「待指派工作池」的虛擬列
+    deptStaffMap.set('', { '員工編號': '', '姓名': '⚠️ 待指派工作', '所屬單位': currentDept, '所屬組別': currentDept });
     
     let deptStaff = Array.from(deptStaffMap.values());
     deptStaff.sort((a, b) => {
+        if (a['員工編號'] === '') return -1; // 待指派池永遠置頂
+        if (b['員工編號'] === '') return 1;
         let idxA = customStaffOrder.indexOf(a['員工編號']); let idxB = customStaffOrder.indexOf(b['員工編號']);
         return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
     });
@@ -40,14 +44,17 @@ function getMixedDeptStaff(monthStr) {
 }
 
 function buildEmpSelectOptions(deptStaffMap, selectedEmpId = '') {
-    let options = `<optgroup label="本單位 / 本月相關人員">`;
+    // ★ 預設加入未指派選項，並確保完全解禁人員選擇
+    let options = `<option value="" ${selectedEmpId === '' ? 'selected' : ''}>-- ⚠️ 未指派 (待補人) --</option>`;
+    options += `<optgroup label="本單位 / 本月相關人員">`;
     Array.from(deptStaffMap.values()).forEach(emp => {
+        if (emp['員工編號'] === '') return; // 略過虛擬人員
         const selected = emp['員工編號'] === selectedEmpId ? 'selected' : '';
         options += `<option value="${emp['員工編號']}" ${selected}>${emp['姓名']}</option>`;
     });
-    options += `</optgroup><optgroup label="全院其他人員 (跨單位支援)">`;
+    options += `</optgroup><optgroup label="全院其他人員 (無限制跨單位支援)">`;
     appData.staff.forEach(emp => {
-        if (!deptStaffMap.has(emp['員工編號']) && emp['員工編號'] !== 'SYS_REMARK' && emp['員工編號'] !== 'SYS_TEMPLATE' && emp['所屬單位'] !== '離職') {
+        if (!deptStaffMap.has(emp['員工編號']) && !emp['員工編號'].startsWith('SYS_') && emp['所屬單位'] !== '離職') {
             const selected = emp['員工編號'] === selectedEmpId ? 'selected' : '';
             options += `<option value="${emp['員工編號']}" ${selected}>${emp['姓名']} (${emp['所屬組別']||'無'})</option>`;
         }
@@ -56,26 +63,19 @@ function buildEmpSelectOptions(deptStaffMap, selectedEmpId = '') {
     return options;
 }
 
-// ⚠️ 防呆攔截器：檢查修改的日期是否綁定模板
 function guardTemplate(dateStr, callback) {
-    // 尋找當天是否有綁定模板的系統紀錄 (未脫鉤)
     const sysTemp = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
-    
     if (sysTemp) {
         if(confirm(`⚠️ 注意：本日已套用模板【${sysTemp['備註']}】。\n\n您現在的修改將會使本日與該模板【脫鉤】(僅變更本日班表)。\n如有需要異動一個月的工作，請退回並直接修改模板。\n\n確定要脫鉤並修改本日嗎？`)) {
-            // 標記為脫鉤 (DECOUPLED)
             markDraft({
                 shiftId: sysTemp['排班ID'], date: dateStr, dept: currentDept, empId: 'SYS_TEMPLATE',
                 task: 'SYS_DECOUPLED', start: '00:00', end: '00:00', category: 'SYS', remark1: sysTemp['備註'], remark2: ''
             });
             callback();
         }
-    } else {
-        callback(); // 沒綁模板，直接放行
-    }
+    } else { callback(); }
 }
 
-// 明確的脫鉤按鈕功能
 function manualDecouple(dateStr) {
     if(confirm('確定要解除此日的模板綁定嗎？\n解除後即可自由修改排班，且系統不會再跳出警告。')) {
         const sysTemp = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE');
@@ -100,7 +100,6 @@ function renderInteractiveGrid() {
 
     const shifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === date);
     
-    // ★ 處理右上角的明確脫鉤與狀態標籤
     const activeTemplate = shifts.find(s => s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
     const statusContainer = document.getElementById('dailyTemplateStatus');
     if (statusContainer) {
@@ -122,7 +121,7 @@ function renderInteractiveGrid() {
     const bottomRemark = dailyRemarkShift['備註2'] || '';
     const dailyRemarkId = dailyRemarkShift['排班ID'] || ('SYS_' + date.replace(/-/g,''));
 
-    const { deptStaff, deptStaffMap } = getMixedDeptStaff(currentMonthStr);
+    const { deptStaff } = getMixedDeptStaff(currentMonthStr);
 
     let topRemarkHtml = `<div class="bg-yellow-50 border-b border-yellow-200 p-2 flex items-center gap-4">
         <span class="text-yellow-700 font-bold text-sm shrink-0">📢 頂部備註：</span>
@@ -141,6 +140,8 @@ function renderInteractiveGrid() {
     container.innerHTML += headerHtml;
 
     deptStaff.forEach(emp => {
+        const isDummy = emp['員工編號'] === ''; // 判斷是否為「待指派池」
+        
         const myShifts = shifts.filter(s => s['員工編號'] == emp['員工編號']);
         let mainShift = myShifts.length > 0 ? myShifts[0] : null;
         let shiftId = mainShift ? mainShift['排班ID'] : '';
@@ -148,19 +149,25 @@ function renderInteractiveGrid() {
         let r2 = mainShift ? (mainShift['備註2'] || '') : '';
         
         let empStatusTag = '';
-        if (emp['所屬單位'] === '離職') empStatusTag = `<span class="text-[9px] text-red-500 bg-red-50 rounded px-1 border border-red-200">離職</span>`;
-        else if (emp['所屬組別'] !== currentDept) empStatusTag = `<span class="text-[9px] text-orange-500 bg-orange-50 rounded px-1 border border-orange-200" title="跨單位支援">外援</span>`;
+        if (isDummy) empStatusTag = `<span class="text-[9px] text-orange-600 bg-orange-100 rounded px-1 border border-orange-300 animate-pulse font-bold mt-0.5">可將工作拖曳給下方人員</span>`;
+        else if (emp['所屬單位'] === '離職') empStatusTag = `<span class="text-[9px] text-red-500 bg-red-50 rounded px-1 border border-red-200 mt-0.5">離職</span>`;
+        else if (emp['所屬組別'] !== currentDept) empStatusTag = `<span class="text-[9px] text-purple-600 bg-purple-50 rounded px-1 border border-purple-200 mt-0.5" title="跨單位支援">外援</span>`;
 
-        let rowHtml = `<div class="flex timeline-container group hover:bg-slate-50 transition border-b h-[50px]">
-            <div class="w-24 p-1 border-r bg-white flex flex-col items-center justify-center shadow-sm z-10 relative cursor-ns-resize shrink-0"
-                 draggable="true" ondragstart="dragRow(event, '${emp['員工編號']}')" ondragover="allowDrop(event)" ondrop="dropRow(event, '${emp['員工編號']}')">
-                <div class="font-bold text-blue-700 cursor-pointer hover:bg-blue-50 py-1 rounded text-sm truncate w-full text-center flex flex-col items-center gap-0.5" onclick="openRowActionModal('${emp['員工編號']}')">
-                    <span>${emp['姓名']} <span class="text-slate-400 text-xs">⚙️</span></span> ${empStatusTag}
+        let rowClass = isDummy ? 'bg-orange-50/40 border-b-[3px] border-orange-200' : 'bg-white hover:bg-slate-50 border-b';
+        let dragProps = isDummy ? '' : `draggable="true" ondragstart="dragRow(event, '${emp['員工編號']}')" ondragover="allowDrop(event)" ondrop="dropRow(event, '${emp['員工編號']}')"`;
+        let nameActionHtml = isDummy ? 
+            `<span class="text-orange-700 text-sm">${emp['姓名']}</span>` : 
+            `<span class="text-blue-700 cursor-pointer hover:bg-blue-50 py-1 rounded w-full text-center" onclick="openRowActionModal('${emp['員工編號']}')">${emp['姓名']} <span class="text-slate-400 text-xs">⚙️</span></span>`;
+
+        let rowHtml = `<div class="flex timeline-container group transition ${rowClass} h-[50px]">
+            <div class="w-24 p-1 border-r ${isDummy ? 'bg-orange-100/50' : 'bg-white'} flex flex-col items-center justify-center shadow-sm z-10 relative ${isDummy ? '' : 'cursor-ns-resize'} shrink-0" ${dragProps}>
+                <div class="font-bold truncate w-full text-center flex flex-col items-center gap-0">
+                    ${nameActionHtml} ${empStatusTag}
                 </div>
-                ${clipboardShift ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[9px] bg-indigo-100 text-indigo-700 px-2 mt-1 rounded shadow hover:bg-indigo-200">📋貼上</button>` : ''}
+                ${(clipboardShift && !isDummy) ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[9px] bg-indigo-100 text-indigo-700 px-2 mt-1 rounded shadow hover:bg-indigo-200">📋貼上</button>` : ''}
             </div>
             
-            <div class="w-32 border-r bg-blue-50/50 flex items-center p-1 shrink-0">
+            <div class="w-32 border-r ${isDummy ? 'bg-orange-50/50' : 'bg-blue-50/50'} flex items-center p-1 shrink-0">
                 <input type="text" class="w-full h-full text-xs p-1 border-transparent focus:border-blue-400 focus:ring-1 rounded bg-white text-blue-800 font-bold"
                        placeholder="${mainShift ? '輸入備註...' : ''}" value="${r1}" ${mainShift ? `onblur="guardTemplate('${date}', () => updateShiftRemarks('${shiftId}', this.value, null))"` : 'disabled'}>
             </div>
@@ -186,7 +193,7 @@ function renderInteractiveGrid() {
                 <div class="text-[9px] text-slate-600 font-semibold mt-[2px]">${shift['開始時間']} - ${shift['結束時間']}</div>
             </div>`;
         });
-        rowHtml += `</div><div class="w-40 border-l bg-teal-50/50 flex items-center p-1 shrink-0">
+        rowHtml += `</div><div class="w-40 border-l ${isDummy ? 'bg-orange-50/50' : 'bg-teal-50/50'} flex items-center p-1 shrink-0">
             <input type="text" class="w-full h-full text-xs p-1 border-transparent focus:border-teal-400 focus:ring-1 rounded bg-white text-teal-800"
                    placeholder="${mainShift ? '補充說明...' : ''}" value="${r2}" ${mainShift ? `onblur="guardTemplate('${date}', () => updateShiftRemarks('${shiftId}', null, this.value))"` : 'disabled'}>
         </div></div>`; 
@@ -200,82 +207,29 @@ function renderInteractiveGrid() {
     container.innerHTML += bottomRemarkHtml;
 }
 
-// ==========================================
-// 🏷️ 版本模板中心邏輯
-// ==========================================
+// === 模板與其他邏輯 ===
+function renderTemplateSelect() {
+    const selApply = document.getElementById('applyTempSelect');
+    const selUpdate = document.getElementById('updateTempSelect');
+    if (!selApply) return;
+    const temps = (appData.templates || []).filter(t => t['部門'] === currentDept && t['類型'] === '平日');
+    const optionsHtml = temps.length ? temps.map(t => `<option value="${t['模板ID']}">${t['模板名稱']}</option>`).join('') : '<option value="">(尚無模板)</option>';
+    selApply.innerHTML = optionsHtml;
+    if (selUpdate) selUpdate.innerHTML = '<option value="">-- 建立全新模板 (另存) --</option>' + optionsHtml;
+}
 
 function toggleTempMode() {
     const mode = document.querySelector('input[name="tempMode"]:checked').value;
-    document.getElementById('tempModeApply').classList.add('hidden');
-    document.getElementById('tempModeSave').classList.add('hidden');
+    document.getElementById('tempModeApply').classList.add('hidden'); document.getElementById('tempModeSave').classList.add('hidden');
     if (mode === 'apply') document.getElementById('tempModeApply').classList.remove('hidden');
     if (mode === 'save') document.getElementById('tempModeSave').classList.remove('hidden');
 }
 
 function toggleTargetInput() {
     const tType = document.getElementById('applyTargetType').value;
-    document.getElementById('targetMultiDayInput').classList.add('hidden');
-    document.getElementById('targetMonthInput').classList.add('hidden');
-    document.getElementById('tempTargetDaysContainer').classList.add('hidden');
-    
-    if (tType === 'multi-day') {
-        document.getElementById('targetMultiDayInput').classList.remove('hidden');
-        document.getElementById('tempTargetDaysContainer').classList.remove('hidden');
-    } else {
-        document.getElementById('targetMonthInput').classList.remove('hidden');
-    }
-}
-
-function renderTemplateSelect() {
-    const selApply = document.getElementById('applyTempSelect');
-    const selUpdate = document.getElementById('updateTempSelect'); // 模式B的更新選單
-    if (!selApply) return;
-    
-    const temps = (appData.templates || []).filter(t => t['部門'] === currentDept && t['類型'] === '平日');
-    const optionsHtml = temps.length ? temps.map(t => `<option value="${t['模板ID']}">${t['模板名稱']}</option>`).join('') : '<option value="">(尚無模板)</option>';
-    
-    selApply.innerHTML = optionsHtml;
-    
-    if (selUpdate) {
-        selUpdate.innerHTML = '<option value="">-- 建立全新模板 (另存) --</option>' + (temps.length ? temps.map(t => `<option value="${t['模板ID']}">${t['模板名稱']}</option>`).join('') : '');
-    }
-}
-
-async function saveCurrentAsTemplate() {
-    const updateId = document.getElementById('updateTempSelect').value;
-    const newName = document.getElementById('newTempName').value.trim();
-    const dateStr = document.getElementById('interactiveDate').value;
-    
-    let targetId = updateId;
-    let targetName = newName;
-    
-    if (updateId) {
-        const tempInfo = appData.templates.find(t => t['模板ID'] === updateId);
-        // 如果選擇了更新現有模板，但沒有輸入新名稱，就沿用舊名稱
-        if (tempInfo) targetName = newName || tempInfo['模板名稱'];
-    } else {
-        if (!newName) return alert('請輸入新模板名稱！');
-        targetId = 'T' + new Date().getTime();
-    }
-    
-    const currentShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && !s['員工編號'].startsWith('SYS_'));
-    if (currentShifts.length === 0) return alert('本日無任何排班，無法存為模板。');
-    
-    document.body.style.cursor = 'wait';
-    await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-            action: 'save_template',
-            templateId: targetId, templateName: targetName, dept: currentDept, type: '平日',
-            snapshot: JSON.stringify(currentShifts)
-        })
-    });
-    showToast('💾 模板儲存/更新成功！');
-    document.getElementById('newTempName').value = '';
-    await reloadData();
-    renderTemplateSelect();
-    document.querySelector('input[value="apply"][name="tempMode"]').click(); toggleTempMode();
-    document.body.style.cursor = 'default';
+    document.getElementById('targetMultiDayInput').classList.add('hidden'); document.getElementById('targetMonthInput').classList.add('hidden'); document.getElementById('tempTargetDaysContainer').classList.add('hidden');
+    if (tType === 'multi-day') { document.getElementById('targetMultiDayInput').classList.remove('hidden'); document.getElementById('tempTargetDaysContainer').classList.remove('hidden'); } 
+    else { document.getElementById('targetMonthInput').classList.remove('hidden'); }
 }
 
 function addTempTargetDay() {
@@ -283,7 +237,6 @@ function addTempTargetDay() {
     if (!dateInput) return alert('請先選擇日期'); if (tempTargetDaysList.includes(dateInput)) return alert('日期已在清單中');
     tempTargetDaysList.push(dateInput); tempTargetDaysList.sort(); renderTempTargetDays();
 }
-
 function removeTempTargetDay(dateStr) { tempTargetDaysList = tempTargetDaysList.filter(d => d !== dateStr); renderTempTargetDays(); }
 function renderTempTargetDays() {
     const container = document.getElementById('tempTargetDaysContainer');
@@ -291,67 +244,74 @@ function renderTempTargetDays() {
     container.innerHTML = tempTargetDaysList.map(date => `<span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded flex items-center gap-1 border border-indigo-200 shadow-sm font-mono">${date} <button onclick="removeTempTargetDay('${date}')" class="text-red-500 hover:text-red-700 font-bold text-sm leading-none">×</button></span>`).join('');
 }
 
+async function saveCurrentAsTemplate() {
+    const updateId = document.getElementById('updateTempSelect').value; const newName = document.getElementById('newTempName').value.trim(); const dateStr = document.getElementById('interactiveDate').value;
+    let targetId = updateId; let targetName = newName;
+    if (updateId) { const tempInfo = appData.templates.find(t => t['模板ID'] === updateId); if (tempInfo) targetName = newName || tempInfo['模板名稱']; } 
+    else { if (!newName) return alert('請輸入新模板名稱！'); targetId = 'T' + new Date().getTime(); }
+    
+    // 包含空字串 empId (未指派工作) 也會一起存進模板中！
+    const currentShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && !s['員工編號'].startsWith('SYS_'));
+    if (currentShifts.length === 0) return alert('本日無任何排班，無法存為模板。');
+    
+    document.body.style.cursor = 'wait';
+    await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'save_template', templateId: targetId, templateName: targetName, dept: currentDept, type: '平日', snapshot: JSON.stringify(currentShifts) }) });
+    showToast('💾 模板儲存/更新成功！'); document.getElementById('newTempName').value = '';
+    await reloadData(); renderTemplateSelect(); document.querySelector('input[value="apply"][name="tempMode"]').click(); toggleTempMode(); document.body.style.cursor = 'default';
+}
 
 function executeApplyTemplate() {
-    const tempId = document.getElementById('applyTempSelect').value;
-    if (!tempId) return alert('請先選擇模板');
+    const tempId = document.getElementById('applyTempSelect').value; if (!tempId) return alert('請先選擇模板');
     const template = appData.templates.find(t => t['模板ID'] === tempId);
-    let sourceShifts = [];
-    try { sourceShifts = JSON.parse(template['排班快照']); } catch(e) {}
+    let sourceShifts = []; try { sourceShifts = JSON.parse(template['排班快照']); } catch(e) {}
     
-    const tType = document.getElementById('applyTargetType').value;
-    let targetDates = [];
-    
-    if (tType === 'multi-day') {
-        if (tempTargetDaysList.length === 0) return alert('請加入目標日期');
-        targetDates = [...tempTargetDaysList];
-    } else {
-        const monthVal = document.getElementById('targetMonthVal').value;
-        if (!monthVal) return alert('請選擇目標月份');
-        const [y, m] = monthVal.split('-');
-        const daysInMonth = new Date(y, m, 0).getDate();
-        for (let d = 1; d <= daysInMonth; d++) {
-            let dt = new Date(y, parseInt(m)-1, d);
-            if (dt.getDay() !== 0 && dt.getDay() !== 6) {
-                targetDates.push(`${y}-${m}-${String(d).padStart(2,'0')}`);
-            }
-        }
+    const tType = document.getElementById('applyTargetType').value; let targetDates = [];
+    if (tType === 'multi-day') { if (tempTargetDaysList.length === 0) return alert('請加入目標日期'); targetDates = [...tempTargetDaysList]; } 
+    else {
+        const monthVal = document.getElementById('targetMonthVal').value; if (!monthVal) return alert('請選擇目標月份');
+        const [y, m] = monthVal.split('-'); const daysInMonth = new Date(y, m, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) { let dt = new Date(y, parseInt(m)-1, d); if (dt.getDay() !== 0 && dt.getDay() !== 6) { targetDates.push(`${y}-${m}-${String(d).padStart(2,'0')}`); } }
     }
     
     if (!confirm(`確定要將模板【${template['模板名稱']}】套用至 ${targetDates.length} 天嗎？\n(現有班表將被覆蓋並轉為草稿)`)) return;
     
     targetDates.forEach(tDate => {
-        // 先標記刪除該日現有的實體班表 (標記為已刪除草稿邏輯)
         const oldShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === tDate && !s['員工編號'].startsWith('SYS_'));
-        oldShifts.forEach(oldS => {
-             appData.shifts = appData.shifts.filter(s => s['排班ID'] !== oldS['排班ID']); 
-             // 實際環境需透過清空 API，為求速度前端直接蓋掉
-        });
+        oldShifts.forEach(oldS => { appData.shifts = appData.shifts.filter(s => s['排班ID'] !== oldS['排班ID']); });
         
-        // 寫入模板班表草稿
-        sourceShifts.forEach(shift => {
-            markDraft({
-                shiftId: 'C' + new Date().getTime() + Math.random().toString(36).substr(2, 5),
-                date: tDate, dept: currentDept, empId: shift['員工編號'], task: shift['工作名稱'], 
-                start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2']
-            });
-        });
+        sourceShifts.forEach(shift => { markDraft({ shiftId: 'C' + new Date().getTime() + Math.random().toString(36).substr(2, 5), date: tDate, dept: currentDept, empId: shift['員工編號'], task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); });
         
-        // ★ 核心：掛上模板綁定識別 (SYS_TEMPLATE)
         const oldSys = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === tDate && s['員工編號'] === 'SYS_TEMPLATE');
-        markDraft({
-            shiftId: oldSys ? oldSys['排班ID'] : 'T_LNK' + tDate.replace(/-/g,''),
-            date: tDate, dept: currentDept, empId: 'SYS_TEMPLATE', task: tempId, start: '00:00', end: '00:00', category: 'SYS', remark1: template['模板名稱'], remark2: ''
-        });
+        markDraft({ shiftId: oldSys ? oldSys['排班ID'] : 'T_LNK' + tDate.replace(/-/g,''), date: tDate, dept: currentDept, empId: 'SYS_TEMPLATE', task: tempId, start: '00:00', end: '00:00', category: 'SYS', remark1: template['模板名稱'], remark2: '' });
     });
     
-    showToast(`✅ 成功套用模板至 ${targetDates.length} 天！請記得儲存發佈。`);
-    document.getElementById('interactiveDate').value = targetDates[0];
-    if (tType === 'multi-day') { tempTargetDaysList = []; renderTempTargetDays(); }
-    renderInteractiveGrid();
+    showToast(`✅ 成功套用模板至 ${targetDates.length} 天！請記得儲存發佈。`); document.getElementById('interactiveDate').value = targetDates[0];
+    if (tType === 'multi-day') { tempTargetDaysList = []; renderTempTargetDays(); } renderInteractiveGrid();
 }
 
-// ... 下方保留您原有的操作輔助邏輯 (saveDailyRemark, updateShiftRemarks, copyShift, pasteShift, dropRow, dropShift, ShiftModal 等) ...
+function previewSelectedTemplate(type) {
+    const selectId = type === 'weekday' ? 'applyTempSelect' : 'hApplyTempSelect'; const tempId = document.getElementById(selectId).value;
+    if (!tempId) return alert('請先選擇一個模板'); const template = appData.templates.find(t => t['模板ID'] === tempId); if (!template) return;
+    document.getElementById('tpModalTitle').innerText = template['模板名稱'];
+    let shifts = []; try { shifts = JSON.parse(template['排班快照']); } catch(e) {}
+    
+    let html = '';
+    if (shifts.length === 0) { html = '<div class="text-slate-500 text-center italic mt-4 font-bold">此模板無任何排班內容。</div>'; } 
+    else {
+        const empMap = new Map();
+        shifts.forEach(s => { if (s['員工編號'].startsWith('SYS_')) return; if (!empMap.has(s['員工編號'])) empMap.set(s['員工編號'], []); empMap.get(s['員工編號']).push(s); });
+        if(empMap.size === 0) { html = '<div class="text-slate-500 text-center italic mt-4 font-bold">此模板僅包含系統備註，無人員班表。</div>'; } 
+        else {
+            const themeColor = type === 'weekday' ? 'blue' : 'pink';
+            empMap.forEach((empShifts, empId) => {
+                const empName = appData.staff.find(e => e['員工編號'] === empId)?.['姓名'] || (empId === '' ? '⚠️ 未指派工作池' : empId);
+                html += `<div class="bg-white border p-3 rounded shadow-sm"><div class="font-bold text-${themeColor}-800 border-b border-${themeColor}-100 pb-1 mb-2">${empName}</div>`;
+                empShifts.forEach(s => { html += `<div class="text-sm text-slate-700 flex justify-between ml-2 mt-1"><span class="font-bold">🔹 [${s['工作名稱']}]</span><span class="text-slate-500 text-xs">${s['開始時間']} - ${s['結束時間']}</span></div>`; if(s['備註'] || s['備註2']) { html += `<div class="text-xs text-slate-400 ml-6 mt-0.5">↳ ${s['備註']} ${s['備註2']}</div>`; } }); html += `</div>`;
+            });
+        }
+    }
+    document.getElementById('tpContent').innerHTML = html; document.getElementById('templatePreviewModal').classList.remove('hidden');
+}
 
 function saveDailyRemark(shiftId, topVal, bottomVal) { const existing = appData.shifts.find(s => s['排班ID'] === shiftId) || {}; markDraft({ shiftId, date: document.getElementById('interactiveDate').value, dept: currentDept, empId: 'SYS_REMARK', task: 'SYS_REMARK', start: '00:00', end: '00:00', category: 'SYS', remark1: topVal !== null ? topVal : (existing['備註'] || ''), remark2: bottomVal !== null ? bottomVal : (existing['備註2'] || '') }); }
 function updateShiftRemarks(shiftId, r1, r2) { const shift = appData.shifts.find(s => s['排班ID'] === shiftId); if(shift) { markDraft({ shiftId, date: shift['日期'], dept: shift['部門名稱'], empId: shift['員工編號'], task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: r1 !== null ? r1 : shift['備註'], remark2: r2 !== null ? r2 : shift['備註2'] }); } }
@@ -367,14 +327,17 @@ function openShiftModal(shiftId = null) {
     const modal = document.getElementById('shiftModal');
     const { deptStaffMap } = getMixedDeptStaff(document.getElementById('interactiveDate').value.substring(0,7));
     const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentDept || !t['部門名稱']);
+    
+    // ★ 如果是新增工作，預設會選擇 '' (未指派)
     let selectedEmpId = shiftId ? (appData.shifts.find(s => s['排班ID'] === shiftId)?.['員工編號'] || '') : '';
     document.getElementById('modalEmp').innerHTML = buildEmpSelectOptions(deptStaffMap, selectedEmpId);
     document.getElementById('modalTask').innerHTML = deptTasks.map(t => `<option value="${t['工作名稱']}">${t['工作名稱']}</option>`).join('');
+    
     if(shiftId) {
         const shift = appData.shifts.find(s => s['排班ID'] === shiftId);
         document.getElementById('modalTitle').innerText = '編輯工作'; document.getElementById('modalShiftId').value = shiftId; document.getElementById('modalTask').value = shift['工作名稱']; document.getElementById('modalStart').value = shift['開始時間']; document.getElementById('modalEnd').value = shift['結束時間']; document.getElementById('modalCat').value = shift['工作類別']; document.getElementById('modalRemark1').value = shift['備註'] || ''; document.getElementById('modalRemark2').value = shift['備註2'] || ''; document.getElementById('btnDeleteShift').classList.remove('hidden');
     } else {
-        document.getElementById('modalTitle').innerText = '新增工作'; document.getElementById('modalShiftId').value = 'S' + new Date().getTime(); document.getElementById('modalStart').value = '08:00'; document.getElementById('modalEnd').value = '12:00'; document.getElementById('modalRemark1').value = ''; document.getElementById('modalRemark2').value = ''; document.getElementById('btnDeleteShift').classList.add('hidden');
+        document.getElementById('modalTitle').innerText = '新增工作 (可先不選人)'; document.getElementById('modalShiftId').value = 'S' + new Date().getTime(); document.getElementById('modalStart').value = '08:00'; document.getElementById('modalEnd').value = '12:00'; document.getElementById('modalRemark1').value = ''; document.getElementById('modalRemark2').value = ''; document.getElementById('btnDeleteShift').classList.add('hidden');
     }
     modal.classList.remove('hidden');
 }
@@ -382,8 +345,8 @@ function closeShiftModal() { document.getElementById('shiftModal').classList.add
 function saveShift() { guardTemplate(document.getElementById('interactiveDate').value, () => { markDraft({ shiftId: document.getElementById('modalShiftId').value, date: document.getElementById('interactiveDate').value, dept: currentDept, empId: document.getElementById('modalEmp').value, task: document.getElementById('modalTask').value, start: document.getElementById('modalStart').value, end: document.getElementById('modalEnd').value, category: document.getElementById('modalCat').value, remark1: document.getElementById('modalRemark1').value, remark2: document.getElementById('modalRemark2').value }); closeShiftModal(); renderInteractiveGrid(); }); }
 async function deleteShift() { guardTemplate(document.getElementById('interactiveDate').value, async () => { if(confirm("確定刪除此工作？(立即生效)")) { await postAction({ action: 'delete_shift', shiftId: document.getElementById('modalShiftId').value }); closeShiftModal(); } }); }
 
-// ⚙️ 整合操作面板
 function openRowActionModal(empId) {
+    if (empId === '') return; // 虛擬人員沒有操作選單
     const emp = appData.staff.find(e => e['員工編號'] === empId); if(!emp) return;
     document.getElementById('raEmpId').value = empId; document.getElementById('raEmpName').innerText = emp['姓名'];
     const { deptStaffMap } = getMixedDeptStaff(document.getElementById('interactiveDate').value.substring(0, 7));
@@ -391,100 +354,9 @@ function openRowActionModal(empId) {
     document.getElementById('rowActionModal').classList.remove('hidden');
 }
 function openQuickEmpFromAction() { document.getElementById('rowActionModal').classList.add('hidden'); openQuickEmpEdit(document.getElementById('raEmpId').value); }
-function replaceEmp(scope) {
-    guardTemplate(document.getElementById('interactiveDate').value, () => {
-        const oldEmpId = document.getElementById('raEmpId').value; const newEmpId = document.getElementById('raReplaceEmp').value;
-        const dateStr = document.getElementById('interactiveDate').value; const monthStr = dateStr.substring(0, 7);
-        if (!newEmpId || oldEmpId === newEmpId) return alert('請選擇不同的接收人員！');
-        let shiftsToReplace = scope === 'day' ? appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === oldEmpId) : appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr) && s['員工編號'] === oldEmpId);
-        if (shiftsToReplace.length === 0) return alert(`此人員無工作可移交。`);
-        if (confirm(`確定要移交 ${shiftsToReplace.length} 筆工作嗎？`)) {
-            shiftsToReplace.forEach(shift => { markDraft({ shiftId: shift['排班ID'], date: shift['日期'], dept: shift['部門名稱'], empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); });
-            document.getElementById('rowActionModal').classList.add('hidden'); showToast(`✅ 已移交`); renderInteractiveGrid();
-        }
-    });
-}
-async function clearEmpShifts(scope) {
-    guardTemplate(document.getElementById('interactiveDate').value, async () => {
-        const empId = document.getElementById('raEmpId').value; const dateStr = document.getElementById('interactiveDate').value; const monthStr = dateStr.substring(0, 7);
-        let shiftsToDelete = scope === 'day' ? appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === empId) : appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr) && s['員工編號'] === empId);
-        if (shiftsToDelete.length === 0) return alert(`此人員無工作。`);
-        if (confirm(`⚠️ 確定要刪除 ${shiftsToDelete.length} 筆工作嗎？`)) {
-            document.body.style.cursor = 'wait'; document.getElementById('rowActionModal').classList.add('hidden');
-            const promises = shiftsToDelete.map(shift => fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_shift', shiftId: shift['排班ID'] }) }).then(r => r.json()));
-            try { await Promise.all(promises); const idsToDelete = new Set(shiftsToDelete.map(s => s['排班ID'])); appData.shifts = appData.shifts.filter(s => !idsToDelete.has(s['排班ID'])); showToast(`🗑️ 已刪除`); } catch(e) { } finally { document.body.style.cursor = 'default'; renderInteractiveGrid(); }
-        }
-    });
-}
-function openQuickEmpEdit(empId) {
-    const emp = appData.staff.find(e => e['員工編號'] === empId); if(!emp) return;
-    document.getElementById('qEmpId').value = empId; document.getElementById('qEmpName').innerText = emp['姓名']; document.getElementById('qDept').value = emp['所屬單位'] || '藥學部'; document.getElementById('qAuth').value = emp['權限'] || ''; document.getElementById('qStartDisplay').innerText = emp['啟用時間'] || '無紀錄'; document.getElementById('qStart').value = emp['啟用時間'] || '';
-    let endStr = emp['停用時間'] || ''; if(endStr && !endStr.includes('T')) endStr = endStr.replace(' ', 'T'); document.getElementById('qEnd').value = endStr;
-    document.getElementById('qCategory').value = emp['所屬類別'] || ''; document.getElementById('qGroup').value = emp['所屬組別'] || ''; document.getElementById('quickEmpModal').classList.remove('hidden');
-}
-function handleDeptChange(val) {
-    if(val === '離職') { const now = new Date(); document.getElementById('qEnd').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`; }
-}
-async function saveQuickEmpEdit() {
-    let endVal = document.getElementById('qEnd').value; if(endVal) endVal = endVal.replace('T', ' '); 
-    const updateData = { '所屬單位': document.getElementById('qDept').value, '權限': document.getElementById('qAuth').value, '停用時間': endVal, '所屬類別': document.getElementById('qCategory').value, '所屬組別': document.getElementById('qGroup').value };
-    document.getElementById('quickEmpModal').classList.add('hidden');
-    await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData });
-    if (!document.getElementById('employeeAdminView').classList.contains('hidden') && typeof renderEmployeeList === 'function') renderEmployeeList();
-}
+function replaceEmp(scope) { guardTemplate(document.getElementById('interactiveDate').value, () => { const oldEmpId = document.getElementById('raEmpId').value; const newEmpId = document.getElementById('raReplaceEmp').value; const dateStr = document.getElementById('interactiveDate').value; const monthStr = dateStr.substring(0, 7); if (!newEmpId || oldEmpId === newEmpId) return alert('請選擇不同的接收人員！'); let shiftsToReplace = scope === 'day' ? appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === oldEmpId) : appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr) && s['員工編號'] === oldEmpId); if (shiftsToReplace.length === 0) return alert(`此人員無工作可移交。`); if (confirm(`確定要移交 ${shiftsToReplace.length} 筆工作嗎？`)) { shiftsToReplace.forEach(shift => { markDraft({ shiftId: shift['排班ID'], date: shift['日期'], dept: shift['部門名稱'], empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); }); document.getElementById('rowActionModal').classList.add('hidden'); showToast(`✅ 已移交`); renderInteractiveGrid(); } }); }
+async function clearEmpShifts(scope) { guardTemplate(document.getElementById('interactiveDate').value, async () => { const empId = document.getElementById('raEmpId').value; const dateStr = document.getElementById('interactiveDate').value; const monthStr = dateStr.substring(0, 7); let shiftsToDelete = scope === 'day' ? appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === empId) : appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr) && s['員工編號'] === empId); if (shiftsToDelete.length === 0) return alert(`此人員無工作。`); if (confirm(`⚠️ 確定要刪除 ${shiftsToDelete.length} 筆工作嗎？`)) { document.body.style.cursor = 'wait'; document.getElementById('rowActionModal').classList.add('hidden'); const promises = shiftsToDelete.map(shift => fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_shift', shiftId: shift['排班ID'] }) }).then(r => r.json())); try { await Promise.all(promises); const idsToDelete = new Set(shiftsToDelete.map(s => s['排班ID'])); appData.shifts = appData.shifts.filter(s => !idsToDelete.has(s['排班ID'])); showToast(`🗑️ 已刪除`); } catch(e) { } finally { document.body.style.cursor = 'default'; renderInteractiveGrid(); } } }); }
 
-// ==========================================
-// 🔍 模板預覽邏輯 (平日/假日共用)
-// ==========================================
-function previewSelectedTemplate(type) {
-    const selectId = type === 'weekday' ? 'applyTempSelect' : 'hApplyTempSelect';
-    const tempId = document.getElementById(selectId).value;
-    
-    if (!tempId) return alert('請先選擇一個模板');
-
-    const template = appData.templates.find(t => t['模板ID'] === tempId);
-    if (!template) return;
-
-    document.getElementById('tpModalTitle').innerText = template['模板名稱'];
-    let shifts = [];
-    try { shifts = JSON.parse(template['排班快照']); } catch(e) {}
-
-    let html = '';
-    if (shifts.length === 0) {
-        html = '<div class="text-slate-500 text-center italic mt-4 font-bold">此模板無任何排班內容。</div>';
-    } else {
-        // 將快照內的班表按「人員」進行群組化，方便閱讀
-        const empMap = new Map();
-        shifts.forEach(s => {
-            if (s['員工編號'].startsWith('SYS_')) return; // 略過系統備註與綁定標籤
-            if (!empMap.has(s['員工編號'])) empMap.set(s['員工編號'], []);
-            empMap.get(s['員工編號']).push(s);
-        });
-
-        if(empMap.size === 0) {
-             html = '<div class="text-slate-500 text-center italic mt-4 font-bold">此模板僅包含系統備註，無人員班表。</div>';
-        } else {
-            const themeColor = type === 'weekday' ? 'blue' : 'pink';
-            empMap.forEach((empShifts, empId) => {
-                const empName = appData.staff.find(e => e['員工編號'] === empId)?.['姓名'] || (empId === '' ? '未指派 (待補人)' : empId);
-                
-                html += `<div class="bg-white border p-3 rounded shadow-sm">
-                    <div class="font-bold text-${themeColor}-800 border-b border-${themeColor}-100 pb-1 mb-2">${empName}</div>`;
-                
-                empShifts.forEach(s => {
-                    html += `<div class="text-sm text-slate-700 flex justify-between ml-2 mt-1">
-                        <span class="font-bold">🔹 [${s['工作名稱']}]</span>
-                        <span class="text-slate-500 text-xs">${s['開始時間']} - ${s['結束時間']}</span>
-                    </div>`;
-                    if(s['備註'] || s['備註2']) {
-                        html += `<div class="text-xs text-slate-400 ml-6 mt-0.5">↳ ${s['備註']} ${s['備註2']}</div>`;
-                    }
-                });
-                html += `</div>`;
-            });
-        }
-    }
-
-    document.getElementById('tpContent').innerHTML = html;
-    document.getElementById('templatePreviewModal').classList.remove('hidden');
-}
+function openQuickEmpEdit(empId) { const emp = appData.staff.find(e => e['員工編號'] === empId); if(!emp) return; document.getElementById('qEmpId').value = empId; document.getElementById('qEmpName').innerText = emp['姓名']; document.getElementById('qDept').value = emp['所屬單位'] || '藥學部'; document.getElementById('qAuth').value = emp['權限'] || ''; document.getElementById('qStartDisplay').innerText = emp['啟用時間'] || '無紀錄'; document.getElementById('qStart').value = emp['啟用時間'] || ''; let endStr = emp['停用時間'] || ''; if(endStr && !endStr.includes('T')) endStr = endStr.replace(' ', 'T'); document.getElementById('qEnd').value = endStr; document.getElementById('qCategory').value = emp['所屬類別'] || ''; document.getElementById('qGroup').value = emp['所屬組別'] || ''; document.getElementById('quickEmpModal').classList.remove('hidden'); }
+function handleDeptChange(val) { if(val === '離職') { const now = new Date(); document.getElementById('qEnd').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`; } }
+async function saveQuickEmpEdit() { let endVal = document.getElementById('qEnd').value; if(endVal) endVal = endVal.replace('T', ' '); const updateData = { '所屬單位': document.getElementById('qDept').value, '權限': document.getElementById('qAuth').value, '停用時間': endVal, '所屬類別': document.getElementById('qCategory').value, '所屬組別': document.getElementById('qGroup').value }; document.getElementById('quickEmpModal').classList.add('hidden'); await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData }); if (!document.getElementById('employeeAdminView').classList.contains('hidden') && typeof renderEmployeeList === 'function') renderEmployeeList(); }
