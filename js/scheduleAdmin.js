@@ -75,32 +75,58 @@ function guardTemplate(dateStr, callback) {
     }
 }
 
+// 明確的脫鉤按鈕功能
+function manualDecouple(dateStr) {
+    if(confirm('確定要解除此日的模板綁定嗎？\n解除後即可自由修改排班，且系統不會再跳出警告。')) {
+        const sysTemp = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE');
+        if(sysTemp) {
+            markDraft({
+                shiftId: sysTemp['排班ID'], date: dateStr, dept: currentDept, empId: 'SYS_TEMPLATE',
+                task: 'SYS_DECOUPLED', start: '00:00', end: '00:00', category: 'SYS', remark1: sysTemp['備註'], remark2: ''
+            });
+            showToast('✂️ 已解除模板綁定，可自由編輯');
+            renderInteractiveGrid();
+        }
+    }
+}
+
 function renderInteractiveGrid() {
     const container = document.getElementById('interactiveGrid');
     container.innerHTML = '';
     const date = document.getElementById('interactiveDate').value;
     const currentMonthStr = date.substring(0, 7);
     
-    // 更新「儲存為新模板」的日期顯示
     if(document.getElementById('saveTempDateDisplay')) document.getElementById('saveTempDateDisplay').innerText = date;
 
     const shifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === date);
     
+    // ★ 處理右上角的明確脫鉤與狀態標籤
+    const activeTemplate = shifts.find(s => s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
+    const statusContainer = document.getElementById('dailyTemplateStatus');
+    if (statusContainer) {
+        if (activeTemplate) {
+            statusContainer.innerHTML = `<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold border border-indigo-200 shadow-sm">🏷️ 已套用：${activeTemplate['備註']}</span>
+            <button onclick="manualDecouple('${date}')" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-2 py-1.5 rounded border border-red-200 font-bold shadow-sm transition">✂️ 解除模板綁定 (跳脫規則)</button>`;
+        } else {
+            const decoupled = shifts.find(s => s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] === 'SYS_DECOUPLED');
+            if (decoupled) {
+                 statusContainer.innerHTML = `<span class="text-xs text-orange-500 font-bold bg-orange-50 px-2 py-1 rounded border border-orange-200">⚠️ 此日已與模板脫鉤 (獨立修改)</span>`;
+            } else {
+                 statusContainer.innerHTML = `<span class="text-xs text-slate-400 font-bold px-2 py-1">📝 自由排班模式</span>`;
+            }
+        }
+    }
+
     const dailyRemarkShift = shifts.find(s => s['員工編號'] === 'SYS_REMARK') || {};
     const topRemark = dailyRemarkShift['備註'] || '';
     const bottomRemark = dailyRemarkShift['備註2'] || '';
     const dailyRemarkId = dailyRemarkShift['排班ID'] || ('SYS_' + date.replace(/-/g,''));
-
-    // 檢查模板掛載狀態
-    const activeTemplate = shifts.find(s => s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
-    let templateBadge = activeTemplate ? `<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold border border-indigo-200">🏷️ 已套用模板：${activeTemplate['備註']}</span>` : '';
 
     const { deptStaff, deptStaffMap } = getMixedDeptStaff(currentMonthStr);
 
     let topRemarkHtml = `<div class="bg-yellow-50 border-b border-yellow-200 p-2 flex items-center gap-4">
         <span class="text-yellow-700 font-bold text-sm shrink-0">📢 頂部備註：</span>
         <input type="text" class="flex-1 bg-transparent border-b border-yellow-300 focus:border-yellow-600 outline-none text-sm text-yellow-800" value="${topRemark}" placeholder="輸入顯示於班表最上方的備註..." onblur="guardTemplate('${date}', () => saveDailyRemark('${dailyRemarkId}', this.value, null))">
-        ${templateBadge}
     </div>`;
     container.innerHTML += topRemarkHtml;
 
@@ -154,7 +180,7 @@ function renderInteractiveGrid() {
             rowHtml += `<div class="absolute top-[4px] bottom-[4px] bg-blue-100 border border-blue-400 rounded shadow-sm flex flex-col justify-center items-center cursor-grab active:cursor-grabbing hover:bg-blue-200 transition overflow-hidden z-10"
                              draggable="true" ondragstart="dragShift(event, '${shift['排班ID']}')" style="left:${left}%; width:${width}%;">
                 <div class="font-bold text-blue-900 text-xs truncate w-full text-center px-1 flex justify-center items-center gap-1">
-                    <span class="cursor-pointer hover:text-blue-600" onclick="openShiftModal('${shift['排班ID']}')">${shift['工作名稱']}</span>
+                    <span class="cursor-pointer hover:text-blue-600" onclick="guardTemplate('${date}', () => openShiftModal('${shift['排班ID']}'))">${shift['工作名稱']}</span>
                     <button onclick="copyShift('${shift['排班ID']}')" class="text-slate-400 hover:text-indigo-700 text-[10px]">📋</button>
                 </div>
                 <div class="text-[9px] text-slate-600 font-semibold mt-[2px]">${shift['開始時間']} - ${shift['結束時間']}</div>
@@ -201,10 +227,55 @@ function toggleTargetInput() {
 }
 
 function renderTemplateSelect() {
-    const sel = document.getElementById('applyTempSelect');
-    if (!sel) return;
+    const selApply = document.getElementById('applyTempSelect');
+    const selUpdate = document.getElementById('updateTempSelect'); // 模式B的更新選單
+    if (!selApply) return;
+    
     const temps = (appData.templates || []).filter(t => t['部門'] === currentDept && t['類型'] === '平日');
-    sel.innerHTML = temps.length ? temps.map(t => `<option value="${t['模板ID']}">${t['模板名稱']}</option>`).join('') : '<option value="">(尚無模板)</option>';
+    const optionsHtml = temps.length ? temps.map(t => `<option value="${t['模板ID']}">${t['模板名稱']}</option>`).join('') : '<option value="">(尚無模板)</option>';
+    
+    selApply.innerHTML = optionsHtml;
+    
+    if (selUpdate) {
+        selUpdate.innerHTML = '<option value="">-- 建立全新模板 (另存) --</option>' + (temps.length ? temps.map(t => `<option value="${t['模板ID']}">${t['模板名稱']}</option>`).join('') : '');
+    }
+}
+
+async function saveCurrentAsTemplate() {
+    const updateId = document.getElementById('updateTempSelect').value;
+    const newName = document.getElementById('newTempName').value.trim();
+    const dateStr = document.getElementById('interactiveDate').value;
+    
+    let targetId = updateId;
+    let targetName = newName;
+    
+    if (updateId) {
+        const tempInfo = appData.templates.find(t => t['模板ID'] === updateId);
+        // 如果選擇了更新現有模板，但沒有輸入新名稱，就沿用舊名稱
+        if (tempInfo) targetName = newName || tempInfo['模板名稱'];
+    } else {
+        if (!newName) return alert('請輸入新模板名稱！');
+        targetId = 'T' + new Date().getTime();
+    }
+    
+    const currentShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && !s['員工編號'].startsWith('SYS_'));
+    if (currentShifts.length === 0) return alert('本日無任何排班，無法存為模板。');
+    
+    document.body.style.cursor = 'wait';
+    await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'save_template',
+            templateId: targetId, templateName: targetName, dept: currentDept, type: '平日',
+            snapshot: JSON.stringify(currentShifts)
+        })
+    });
+    showToast('💾 模板儲存/更新成功！');
+    document.getElementById('newTempName').value = '';
+    await reloadData();
+    renderTemplateSelect();
+    document.querySelector('input[value="apply"][name="tempMode"]').click(); toggleTempMode();
+    document.body.style.cursor = 'default';
 }
 
 function addTempTargetDay() {
@@ -220,31 +291,6 @@ function renderTempTargetDays() {
     container.innerHTML = tempTargetDaysList.map(date => `<span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded flex items-center gap-1 border border-indigo-200 shadow-sm font-mono">${date} <button onclick="removeTempTargetDay('${date}')" class="text-red-500 hover:text-red-700 font-bold text-sm leading-none">×</button></span>`).join('');
 }
 
-async function saveCurrentAsTemplate() {
-    const name = document.getElementById('newTempName').value.trim();
-    const dateStr = document.getElementById('interactiveDate').value;
-    if (!name) return alert('請輸入模板名稱！');
-    
-    // 只取人員實體班表，排除 SYS_REMARK 與 SYS_TEMPLATE
-    const currentShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && !s['員工編號'].startsWith('SYS_'));
-    if (currentShifts.length === 0) return alert('本日無任何排班，無法存為模板。');
-    
-    document.body.style.cursor = 'wait';
-    await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-            action: 'save_template',
-            templateId: 'T' + new Date().getTime(), templateName: name, dept: currentDept, type: '平日',
-            snapshot: JSON.stringify(currentShifts)
-        })
-    });
-    showToast('💾 模板儲存成功！');
-    document.getElementById('newTempName').value = '';
-    await reloadData();
-    renderTemplateSelect();
-    document.querySelector('input[value="apply"]').click(); toggleTempMode();
-    document.body.style.cursor = 'default';
-}
 
 function executeApplyTemplate() {
     const tempId = document.getElementById('applyTempSelect').value;
