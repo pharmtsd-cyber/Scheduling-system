@@ -155,18 +155,29 @@
                     </div>
                 </div>
 
-                <!-- 模式 B：存為新模板 -->
-                <div id="hTempModeSave" class="hidden flex flex-wrap items-end gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500">選擇來源日期</label>
-                        <input type="date" id="hSaveSourceDate" class="border p-1.5 rounded bg-white font-bold">
+<!-- 模式 B：存為模板 (支援更新或另存新檔) -->
+                <div id="hTempModeSave" class="hidden flex flex-col gap-3">
+                    <div class="text-sm font-bold text-slate-700">
+                        將特定來源日期的班表架構存為假日模板：
                     </div>
-                    <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500">假日模板名稱</label>
-                        <input type="text" id="hNewTempName" class="border p-1.5 rounded bg-white w-64" placeholder="例如：常規週末班 (無門診)">
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500">選擇來源日期</label>
+                            <input type="date" id="hSaveSourceDate" class="border p-1.5 rounded bg-white font-bold">
+                        </div>
+                        <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500">更新現有假日模板 (覆蓋舊版)</label>
+                            <select id="hUpdateTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-pink-700">
+                                <option value="">-- 建立全新模板 (另存) --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500">或 建立新假日模板名稱</label>
+                            <input type="text" id="hNewTempName" class="border p-1.5 rounded bg-white w-64" placeholder="若要另存，請在此輸入新名稱">
+                        </div>
+                        <button onclick="saveHolidayAsTemplate()" class="bg-teal-600 text-white px-6 py-1.5 rounded shadow hover:bg-teal-700 font-bold">💾 執行儲存</button>
                     </div>
-                    <button onclick="saveHolidayAsTemplate()" class="bg-teal-600 text-white px-4 py-1.5 rounded shadow hover:bg-teal-700 font-bold">💾 儲存為模板</button>
                 </div>
             </div>
 
