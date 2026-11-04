@@ -85,12 +85,12 @@ function updateActiveShift(data) {
     }
 }
 
-// 防呆脫鉤攔截 (自動將傳入的 targetDate 脫鉤)
+// 防呆脫鉤攔截
 function guardUnifiedAction(targetDate, callback) {
     if (currentAdminTab === 'template') { callback(); return; }
     const sysTemp = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === targetDate && s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
     if (sysTemp) {
-        if(confirm(`⚠️ 脫鉤警告：${targetDate} 已套用模板【${sysTemp['備註']}】。\n您現在的修改將會使該日獨立脫鉤。\n\n確定要脫鉤並修改嗎？`)) {
+        if(confirm(`⚠️ 脫鉤警告：${targetDate} 已套用模板【${sysTemp['備註'] || sysTemp['remark1'] || '未知模板'}】。\n您現在的修改將會使該日獨立脫鉤。\n\n確定要脫鉤並修改嗎？`)) {
             sysTemp['工作名稱'] = 'SYS_DECOUPLED';
             markDraft({ shiftId: sysTemp['排班ID'], date: targetDate, dept: currentDept, empId: 'SYS_TEMPLATE', task: 'SYS_DECOUPLED', start: '00:00', end: '00:00', category: 'SYS', remark1: sysTemp['備註'], remark2: '' });
             callback();
@@ -103,7 +103,9 @@ function handleUnifiedAction(action, dateContext, ...args) {
     const targetDate = currentAdminTab === 'template' ? 'TEMPLATE' : (dateContext || document.getElementById('viewTimelineDate').value);
     
     guardUnifiedAction(targetDate, () => {
-        if (action === 'add_shift') { openShiftModal(null, targetDate); }
+        if (action === 'add_shift') { 
+            openShiftModal(null, targetDate); 
+        }
         else if (action === 'update_remarks') {
             const empId = args[0]; const r1 = args[1]; const r2 = args[2];
             if(!empId) return;
@@ -121,11 +123,26 @@ function handleUnifiedAction(action, dateContext, ...args) {
             }
             renderUnifiedGrid();
         }
+        else if (action === 'update_sys_remark') {
+            const r1 = args[0]; const r2 = args[1];
+            let shifts = getActiveShifts(targetDate);
+            let sysShift = shifts.find(s => s['員工編號'] === 'SYS_REMARK');
+            if (!sysShift) {
+                updateActiveShift({ shiftId: 'SYS_R_' + new Date().getTime(), date: targetDate, dept: currentDept, empId: 'SYS_REMARK', task: 'SYS_REMARK', start: '00:00', end: '00:00', category: 'SYS', remark1: r1 !== null ? r1 : '', remark2: r2 !== null ? r2 : '' });
+            } else {
+                updateActiveShift({ shiftId: sysShift['排班ID'], date: targetDate, dept: currentDept, empId: 'SYS_REMARK', task: 'SYS_REMARK', start: '00:00', end: '00:00', category: 'SYS', remark1: r1 !== null ? r1 : sysShift['備註'], remark2: r2 !== null ? r2 : sysShift['備註2'] });
+            }
+            renderUnifiedGrid();
+        }
         else if (action === 'assign_matrix_emp') {
-            // 矩陣視圖下的直接派工
             const shiftId = args[0]; const newEmpId = args[1];
             const shift = getActiveShifts(targetDate).find(s => s['排班ID'] === shiftId);
             if(shift) { updateActiveShift({ shiftId: shift['排班ID'], date: targetDate, dept: currentDept, empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); renderUnifiedGrid(); }
+        }
+        else if (action === 'move_shift_emp') {
+            const shiftId = args[0]; const newEmpId = args[1];
+            const shift = getActiveShifts(targetDate).find(s => s['排班ID'] === shiftId);
+            if (shift) { updateActiveShift({ shiftId: shift['排班ID'], date: targetDate, dept: currentDept, empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); renderUnifiedGrid(); }
         }
         else if (action === 'delete_shift') {
             const shiftId = args[0];
@@ -134,6 +151,18 @@ function handleUnifiedAction(action, dateContext, ...args) {
             closeShiftModal(); renderUnifiedGrid();
         }
     });
+}
+
+function manualDecouple(dateStr) {
+    if(confirm('確定要解除此日的模板綁定嗎？\n解除後即可自由修改此日排班，且系統不會再跳出警告。')) {
+        const sysTemp = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE');
+        if(sysTemp) {
+            sysTemp['工作名稱'] = 'SYS_DECOUPLED';
+            markDraft({ shiftId: sysTemp['排班ID'], date: dateStr, dept: currentDept, empId: 'SYS_TEMPLATE', task: 'SYS_DECOUPLED', start: '00:00', end: '00:00', category: 'SYS', remark1: sysTemp['備註'], remark2: '' });
+            showToast('✂️ 已解除模板綁定，可自由編輯');
+            renderUnifiedGrid();
+        }
+    }
 }
 
 // === 模板 CRUD 與套用引擎 ===
@@ -199,7 +228,7 @@ function executeAdvancedApply() {
     const template = appData.templates.find(t => t['模板ID'] === tempId);
     let sourceShifts = []; try { sourceShifts = JSON.parse(template['排班快照']); } catch(e) {}
     
-    let targetDates = new Set([...engineSpecificDates]); // 加入自訂日期
+    let targetDates = new Set([...engineSpecificDates]);
     
     const monthVal = document.getElementById('engineTargetMonth').value;
     if (monthVal) {
@@ -255,7 +284,6 @@ function renderTimelineView() {
     const targetDate = getActiveContextDate();
     const shifts = getActiveShifts(targetDate);
     
-    // 渲染狀態列
     if (currentAdminTab === 'daily') {
         const activeTemplate = shifts.find(s => s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
         const statusContainer = document.getElementById('dailyTemplateStatus');
@@ -269,14 +297,16 @@ function renderTimelineView() {
         }
     }
 
-    const { deptStaffMap } = typeof getMixedDeptStaff === 'function' ? getMixedDeptStaff(targetDate === 'TEMPLATE' ? document.getElementById('interactiveDate').value.substring(0,7) : targetDate.substring(0, 7)) : { deptStaffMap: new Map() };
-    
-    // 人員名單準備 (同舊版邏輯)
-    let displayRows = [];
+    const monthEmpIds = new Set(appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(targetDate === 'TEMPLATE' ? document.getElementById('viewTimelineDate').value.substring(0, 7) : targetDate.substring(0, 7))).map(s => s['員工編號']));
+    let deptStaffMap = new Map();
     appData.staff.forEach(s => {
-        if ((s['所屬組別'] === currentDept && s['所屬單位'] !== '離職') || shifts.some(sh => sh['員工編號'] === s['員工編號'])) {
-            if (!s['員工編號'].startsWith('SYS_')) displayRows.push({ ...s, isDummy: false, rowId: s['員工編號'] });
-        }
+        if (monthEmpIds.has(s['員工編號']) || (s['所屬組別'] === currentDept && s['所屬單位'] !== '離職')) deptStaffMap.set(s['員工編號'], s);
+    });
+    deptStaffMap.delete('SYS_REMARK'); deptStaffMap.delete('SYS_TEMPLATE'); deptStaffMap.delete('');
+    
+    let displayRows = [];
+    Array.from(deptStaffMap.values()).forEach(s => {
+        if (!s['員工編號'].startsWith('SYS_')) displayRows.push({ ...s, isDummy: false, rowId: s['員工編號'] });
     });
     shifts.filter(s => s['員工編號'] === '').forEach(shift => { displayRows.push({ '員工編號': '', '姓名': '⚠️ 待指派', '所屬單位': currentDept, '所屬組別': currentDept, isDummy: true, rowId: shift['排班ID'], shiftData: shift }); });
     
@@ -285,7 +315,12 @@ function renderTimelineView() {
         return (idxA === -1 ? (a.isDummy?-1:999) : idxA) - (idxB === -1 ? (b.isDummy?-1:999) : idxB);
     });
 
-    // 繪製表頭 (省略重複程式碼，同舊版時間軸表頭結構)
+    const sysRemarkShift = shifts.find(s => s['員工編號'] === 'SYS_REMARK') || {};
+    container.innerHTML += `<div class="bg-yellow-50 border-b border-yellow-200 p-2 flex items-center gap-4">
+        <span class="text-yellow-700 font-bold text-sm shrink-0">📢 頂部備註：</span>
+        <input type="text" class="flex-1 bg-transparent border-b border-yellow-300 focus:border-yellow-600 outline-none text-sm text-yellow-800" value="${sysRemarkShift['備註'] || ''}" placeholder="輸入頂部備註..." onblur="handleUnifiedAction('update_sys_remark', '${targetDate}', this.value, null)">
+    </div>`;
+
     let headerHtml = `<div class="flex border-b bg-slate-200 text-[11px] font-bold text-slate-600 sticky top-0 z-20"><div class="w-24 p-2 border-r text-center shrink-0 flex items-center justify-center bg-slate-200"><span class="w-4">#</span> <span class="flex-1">人員名單</span></div><div class="w-32 p-2 border-r text-center shrink-0 flex items-center justify-center text-blue-700 bg-blue-50">個人備註</div><div class="flex-1 flex min-w-[500px]">`;
     for(let i=8; i<=21; i++) headerHtml += `<div class="flex-1 border-l border-slate-300 pl-1 py-1 text-slate-700">${i}:00</div><div class="flex-1 border-l border-dashed border-slate-300 pl-1 py-1 text-[9px] text-slate-400">30</div>`;
     headerHtml += `<div class="w-8 border-l border-slate-300 pl-1 py-1 text-slate-700">22</div></div><div class="w-40 p-2 border-l text-center shrink-0 flex items-center justify-center text-teal-700 bg-teal-50">工作補充</div></div>`;
@@ -317,7 +352,7 @@ function renderTimelineView() {
                        placeholder="備註..." value="${r1}" onblur="handleUnifiedAction('update_remarks', '${targetDate}', '${emp['員工編號']}', this.value, null)">
             </div>
             
-            <div class="flex-1 relative">
+            <div class="flex-1 relative drop-zone" ondragover="allowDrop(event)" ondrop="handleUnifiedAction('move_shift_emp', '${targetDate}', event.dataTransfer.getData('shiftId'), '${emp['員工編號']}')">
                 <div class="absolute inset-0 flex pointer-events-none opacity-20">`;
         for(let i=8; i<=21; i++) rowHtml += `<div class="flex-1 border-l border-slate-400"></div><div class="flex-1 border-l border-dashed border-slate-400"></div>`;
         rowHtml += `</div>`;
@@ -328,8 +363,8 @@ function renderTimelineView() {
             const left = ((sh - 8) + sm/60) / 14 * 100; const width = ((eh - sh) + (em - sm)/60) / 14 * 100;
             let shiftBg = isDummy ? 'bg-amber-100 border-2 border-dashed border-amber-500 hover:bg-amber-200' : 'bg-blue-100 border border-blue-400 hover:bg-blue-200';
             
-            rowHtml += `<div class="absolute top-[4px] bottom-[4px] ${shiftBg} shadow-sm rounded flex flex-col justify-center items-center cursor-pointer transition overflow-hidden z-10"
-                             onclick="handleUnifiedAction('add_shift', '${targetDate}', '${shift['排班ID']}')" style="left:${left}%; width:${width}%;">
+            rowHtml += `<div class="absolute top-[4px] bottom-[4px] ${shiftBg} shadow-sm rounded flex flex-col justify-center items-center cursor-grab active:cursor-grabbing transition overflow-hidden z-10"
+                             draggable="true" ondragstart="dragShift(event, '${shift['排班ID']}')" onclick="handleUnifiedAction('add_shift', '${targetDate}', '${shift['排班ID']}')" style="left:${left}%; width:${width}%;">
                 <div class="font-bold text-${isDummy?'amber':'blue'}-900 text-xs truncate w-full text-center px-1">${shift['工作名稱']}</div>
                 <div class="text-[9px] text-${isDummy?'amber':'slate'}-600 font-semibold mt-[2px]">${shift['開始時間']} - ${shift['結束時間']}</div>
             </div>`;
@@ -340,6 +375,11 @@ function renderTimelineView() {
         </div></div>`; 
         container.innerHTML += rowHtml;
     });
+
+    container.innerHTML += `<div class="bg-yellow-50 border-t border-yellow-200 p-2 flex items-center gap-2 mt-2">
+        <span class="text-yellow-700 font-bold text-sm shrink-0">📢 底部備註：</span>
+        <input type="text" class="flex-1 bg-transparent border-b border-yellow-300 focus:border-yellow-600 outline-none text-sm text-yellow-800" value="${sysRemarkShift['備註2'] || ''}" placeholder="輸入底部備註..." onblur="handleUnifiedAction('update_sys_remark', '${targetDate}', null, this.value)">
+    </div>`;
 }
 
 function renderMatrixView() {
@@ -395,13 +435,36 @@ function renderMatrixView() {
     tableHtml += `</tbody></table>`; container.innerHTML = tableHtml;
 }
 
-// === 彈出 Modal 控制邏輯 (與舊版相容，補上 targetDate 傳遞) ===
+// === 彈出 Modal 與拖拉控制邏輯 ===
 let modalTargetDate = null;
-function openShiftModal(shiftId = null, targetDate) {
-    modalTargetDate = targetDate;
+function updateModalEmp(empId) { document.getElementById('modalEmp').value = empId; document.getElementById('txtModalEmp').innerText = getEmpNameWithDefault(empId, '-- ⚠️ 未指派 (留空) --'); }
+
+function openShiftModal(shiftId = null, targetDate = null) {
+    modalTargetDate = targetDate || getActiveContextDate();
     const modal = document.getElementById('shiftModal');
-    // ...(其餘邏輯同舊版，需於 saveShift() 中讀取 modalTargetDate 寫回)
+    const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentDept || !t['部門名稱']);
+    
+    let selectedEmpId = shiftId ? (getActiveShifts(modalTargetDate).find(s => s['排班ID'] === shiftId)?.['員工編號'] || '') : '';
+    updateModalEmp(selectedEmpId);
+    
+    document.getElementById('modalTask').innerHTML = deptTasks.map(t => `<option value="${t['工作名稱']}">${t['工作名稱']}</option>`).join('');
+    
+    if(shiftId) {
+        const shift = getActiveShifts(modalTargetDate).find(s => s['排班ID'] === shiftId);
+        document.getElementById('modalTitle').innerText = '編輯工作'; document.getElementById('modalShiftId').value = shiftId; document.getElementById('modalTask').value = shift['工作名稱']; document.getElementById('modalStart').value = shift['開始時間']; document.getElementById('modalEnd').value = shift['結束時間']; document.getElementById('modalCat').value = shift['工作類別']; document.getElementById('modalRemark1').value = shift['備註'] || ''; document.getElementById('modalRemark2').value = shift['備註2'] || ''; document.getElementById('btnDeleteShift').classList.remove('hidden');
+    } else {
+        document.getElementById('modalTitle').innerText = '新增工作 (可先不選人)'; document.getElementById('modalShiftId').value = 'S' + new Date().getTime(); document.getElementById('modalStart').value = '08:00'; document.getElementById('modalEnd').value = '12:00'; document.getElementById('modalRemark1').value = ''; document.getElementById('modalRemark2').value = ''; document.getElementById('btnDeleteShift').classList.add('hidden');
+    }
     modal.classList.remove('hidden');
 }
+
 function closeShiftModal() { document.getElementById('shiftModal').classList.add('hidden'); }
-function manualDecouple(dateStr) { handleUnifiedAction('decouple', dateStr); }
+function saveShift() { 
+    handleUnifiedAction('update_remarks', modalTargetDate, document.getElementById('modalEmp').value, document.getElementById('modalRemark1').value, document.getElementById('modalRemark2').value); // 確保觸發載體儲存
+    const shiftData = { shiftId: document.getElementById('modalShiftId').value, date: modalTargetDate, dept: currentDept, empId: document.getElementById('modalEmp').value, task: document.getElementById('modalTask').value, start: document.getElementById('modalStart').value, end: document.getElementById('modalEnd').value, category: document.getElementById('modalCat').value, remark1: document.getElementById('modalRemark1').value, remark2: document.getElementById('modalRemark2').value };
+    updateActiveShift(shiftData); closeShiftModal(); renderUnifiedGrid();
+}
+function deleteShift() { handleUnifiedAction('delete_shift', modalTargetDate, document.getElementById('modalShiftId').value); }
+
+function allowDrop(ev) { ev.preventDefault(); }
+function dragShift(ev, shiftId) { ev.dataTransfer.setData("shiftId", shiftId); ev.stopPropagation(); }
