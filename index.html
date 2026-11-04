@@ -267,6 +267,55 @@
         </div>
     </div>
 
+    <!-- 員工快速編輯 Modal (已補回) -->
+    <div id="quickEmpModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-lg shadow-xl w-[450px] p-6 border border-slate-200">
+            <h3 class="text-xl font-bold mb-4 text-teal-700 flex justify-between border-b pb-2">
+                <span>👤 編輯人員設定</span><span id="qEmpName" class="text-slate-500"></span>
+            </h3>
+            <input type="hidden" id="qEmpId">
+            <div class="space-y-4">
+                <div class="flex gap-3">
+                    <div class="w-1/2">
+                        <label class="text-sm font-bold text-slate-600 block mb-1">所屬單位</label>
+                        <select id="qDept" class="w-full border-2 border-slate-200 focus:border-teal-400 p-2 rounded outline-none" onchange="handleDeptChange(this.value)">
+                            <option value="藥學部">藥學部</option>
+                            <option value="離職">離職</option>
+                        </select>
+                    </div>
+                    <div class="w-1/2"><label class="text-sm font-bold text-slate-600 block mb-1">權限</label><input type="text" id="qAuth" class="w-full border-2 border-slate-200 focus:border-teal-400 p-2 rounded outline-none"></div>
+                </div>
+                <div class="flex gap-3">
+                    <div class="w-1/2">
+                        <label class="text-sm font-bold text-slate-500 block mb-1">啟用時間 (唯讀)</label>
+                        <div id="qStartDisplay" class="w-full p-2 bg-slate-100 border border-slate-200 rounded text-slate-500 text-sm font-mono"></div>
+                        <input type="hidden" id="qStart">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="text-sm font-bold text-slate-600 block mb-1">停用時間</label>
+                        <input type="datetime-local" step="1" id="qEnd" class="w-full border-2 border-slate-200 focus:border-teal-400 p-2 rounded outline-none text-xs font-mono">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm font-bold text-slate-600 block mb-1">所屬類別</label>
+                    <select id="qCategory" class="w-full border-2 border-slate-200 focus:border-teal-400 p-2 rounded outline-none font-bold text-slate-700">
+                        <option value="">--選擇類別--</option><option value="部本部">部本部</option><option value="藥品調劑科">藥品調劑科</option><option value="臨床藥學科">臨床藥學科</option><option value="IRB">IRB</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm font-bold text-slate-600 block mb-1">所屬組別</label>
+                    <select id="qGroup" class="w-full border-2 border-slate-200 focus:border-teal-400 p-2 rounded outline-none font-bold text-slate-700">
+                        <option value="">--選擇組別--</option><option value="門診藥局">門診藥局</option><option value="藥品調劑科">藥品調劑科</option><option value="藥學部">藥學部</option><option value="調配藥局">調配藥局</option><option value="正確用藥推廣組">正確用藥推廣組</option><option value="藥物諮詢組">藥物諮詢組</option><option value="急診藥局">急診藥局</option><option value="住院藥局">住院藥局</option><option value="智能運管組">智能運管組</option><option value="臨床藥學科">臨床藥學科</option><option value="藥品管理組">藥品管理組</option><option value="藥學教育組">藥學教育組</option><option value="作業品質控管組">作業品質控管組</option><option value="藥事照護組">藥事照護組</option><option value="臨床試驗藥局">臨床試驗藥局</option><option value="IRB">IRB</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3 border-t pt-4">
+                <button onclick="document.getElementById('quickEmpModal').classList.add('hidden')" class="px-5 py-2 bg-slate-100 hover:bg-slate-200 rounded font-bold text-slate-600 transition">取消</button>
+                <button onclick="saveQuickEmpEdit()" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded font-bold shadow-md transition">確認儲存</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/ui.js"></script>
