@@ -96,17 +96,75 @@
                 </div>
             </div>
 
-            <!-- 批次建立常規週期班表 -->
-            <div class="bg-pink-50 p-3 rounded shadow mb-4 border border-pink-200 flex flex-wrap items-center gap-4">
-                <span class="font-bold text-pink-800 text-sm">⚡ 批次建立週期工作：</span>
-                <div>
-                    <select id="batchWeekday" class="border p-1 rounded text-sm"><option value="1">每週一</option><option value="2">每週二</option><option value="3">每週三</option><option value="4">每週四</option><option value="5">每週五</option><option value="6">每週六</option><option value="0">每週日</option></select>
+<!-- 🏷️ 假日班版本模板中心 (儲存與套用) -->
+            <div class="bg-pink-50 p-4 rounded shadow mb-4 border-l-4 border-pink-500 relative shrink-0">
+                <div class="flex items-center gap-4 mb-3 border-b border-pink-200 pb-2">
+                    <span class="font-bold text-pink-800">🏷️ 假日模板中心：</span>
+                    <label class="cursor-pointer flex items-center gap-1 font-bold text-sm text-slate-700"><input type="radio" name="hTempMode" value="apply" onchange="toggleHolidayTempMode()" checked> 選擇模板套用</label>
+                    <label class="cursor-pointer flex items-center gap-1 font-bold text-sm text-slate-700"><input type="radio" name="hTempMode" value="save" onchange="toggleHolidayTempMode()"> 將特定日期存為新模板</label>
                 </div>
-                <span class="text-sm font-bold text-slate-600">加入</span>
-                <div>
-                    <select id="batchTask" class="border p-1 rounded text-sm text-blue-800 font-bold min-w-[120px]"></select>
+
+                <!-- 模式 A：套用模板 (支援多選日期 或 某月某週幾) -->
+                <div id="hTempModeApply" class="flex flex-col gap-3">
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500">1. 選擇假日模板</label>
+                            <select id="hApplyTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-pink-700"></select>
+                        </div>
+                        <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500">2. 套用目標方式</label>
+                            <select id="hApplyTargetType" onchange="toggleHolidayTargetInput()" class="border p-1.5 rounded bg-white font-bold">
+                                <option value="multi-day">特定日期 (多選)</option>
+                                <option value="month-weekday">某月的特定星期幾 (複選)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 選擇器：特定日期 (多選) -->
+                        <div id="hTargetMultiDayInput" class="flex items-end gap-2">
+                            <div><input type="date" id="hTargetDateVal" class="border p-1.5 rounded bg-white"></div>
+                            <button onclick="addHolidayTempTargetDay()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold text-sm shadow-sm">➕ 加入</button>
+                        </div>
+                        
+                        <!-- 選擇器：某月的特定星期幾 (複選) -->
+                        <div id="hTargetMonthWeekdayInput" class="hidden flex-col gap-2">
+                            <div class="flex gap-2 items-center">
+                                <div><input type="month" id="hTargetMonthVal" class="border p-1.5 rounded bg-white"></div>
+                                <div class="flex gap-2 bg-white p-1 rounded border">
+                                    <label class="text-sm font-bold flex items-center gap-1"><input type="checkbox" name="hTargetWeekdays" value="0">日</label>
+                                    <label class="text-sm font-bold flex items-center gap-1"><input type="checkbox" name="hTargetWeekdays" value="6">六</label>
+                                    <span class="text-slate-300">|</span>
+                                    <label class="text-sm flex items-center gap-1"><input type="checkbox" name="hTargetWeekdays" value="1">一</label>
+                                    <label class="text-sm flex items-center gap-1"><input type="checkbox" name="hTargetWeekdays" value="2">二</label>
+                                    <label class="text-sm flex items-center gap-1"><input type="checkbox" name="hTargetWeekdays" value="3">三</label>
+                                    <label class="text-sm flex items-center gap-1"><input type="checkbox" name="hTargetWeekdays" value="4">四</label>
+                                    <label class="text-sm flex items-center gap-1"><input type="checkbox" name="hTargetWeekdays" value="5">五</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex-1"></div>
+                        <button onclick="executeApplyHolidayTemplate()" class="bg-pink-600 text-white px-4 py-1.5 rounded shadow hover:bg-pink-700 font-bold">🚀 執行套用 (產生草稿)</button>
+                    </div>
+                    
+                    <div id="hTempTargetDaysContainer" class="flex flex-wrap gap-2 min-h-[34px] p-2 bg-white border border-dashed border-slate-300 rounded items-center">
+                        <span class="text-xs text-slate-400">尚未加入目標日期...</span>
+                    </div>
                 </div>
-                <button onclick="createBatchHolidayTask()" class="bg-indigo-500 text-white px-3 py-1 rounded text-sm font-bold hover:bg-indigo-600 shadow">執行批次建立</button>
+
+                <!-- 模式 B：存為新模板 -->
+                <div id="hTempModeSave" class="hidden flex flex-wrap items-end gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500">選擇來源日期</label>
+                        <input type="date" id="hSaveSourceDate" class="border p-1.5 rounded bg-white font-bold">
+                    </div>
+                    <div class="text-xl text-slate-400 font-bold mb-1">➡️</div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500">假日模板名稱</label>
+                        <input type="text" id="hNewTempName" class="border p-1.5 rounded bg-white w-64" placeholder="例如：常規週末班 (無門診)">
+                    </div>
+                    <button onclick="saveHolidayAsTemplate()" class="bg-teal-600 text-white px-4 py-1.5 rounded shadow hover:bg-teal-700 font-bold">💾 儲存為模板</button>
+                </div>
             </div>
 
             <div class="bg-white p-2 rounded shadow overflow-x-auto">
