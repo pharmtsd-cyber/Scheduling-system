@@ -10,7 +10,8 @@ async function reloadData() {
                 tasks: json.data['工作清單'] || [],
                 shifts: json.data['排班紀錄'] || [],
                 auths: json.data['權限清單'] || [],
-                sysInfo: json.data['系統資訊'] || { viewCount: 0 }
+                sysInfo: json.data['系統資訊'] || { viewCount: 0 },
+                templates: json.data['排班模板'] || []
             };
             // 將發佈紀錄獨立拉出，供 historyAdmin.js 讀取
             appData['發佈紀錄'] = json.data['發佈紀錄'] || [];
