@@ -28,6 +28,21 @@ function guardHolidayTemplate(dateStr, callback) {
     } else { callback(); }
 }
 
+// 明確的假日脫鉤按鈕功能
+function manualHolidayDecouple(dateStr) {
+    if(confirm('確定要解除此日的模板綁定嗎？\n解除後即可自由修改此日排班，且系統不會再跳出警告。')) {
+        const sysTemp = appData.shifts.find(s => s['部門名稱'] === currentHolidayDept && s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE');
+        if(sysTemp) {
+            markDraft({
+                shiftId: sysTemp['排班ID'], date: dateStr, dept: currentHolidayDept, empId: 'SYS_TEMPLATE',
+                task: 'SYS_DECOUPLED', start: '00:00', end: '00:00', category: 'SYS', remark1: sysTemp['備註'], remark2: ''
+            });
+            showToast('✂️ 已解除假日模板綁定，可自由編輯');
+            renderHolidayGrid();
+        }
+    }
+}
+
 function renderHolidayGrid() {
     currentHolidayDept = document.getElementById('holidayDeptSelect').value;
     const monthStr = document.getElementById('holidayMonth').value;
@@ -53,19 +68,26 @@ function renderHolidayGrid() {
         const rowClass = isWeekend ? 'bg-pink-50' : '';
         const dateColor = isWeekend ? 'text-red-500 font-bold' : 'text-slate-700 font-bold';
 
-        // 篩除系統隱藏標記
         let dailyShifts = monthShifts.filter(s => s['日期'] === dateStr && !s['員工編號'].startsWith('SYS_'));
         if (catFilter !== 'ALL') dailyShifts = dailyShifts.filter(s => s['工作類別'] === catFilter);
 
-        // 檢查模板掛載狀態
+        // ★ 處理格子內的模板狀態與脫鉤按鈕
         const activeTemplate = monthShifts.find(s => s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
-        let templateBadge = activeTemplate ? `<div class="mt-1 text-[9px] bg-pink-100 text-pink-700 px-1 py-0.5 rounded border border-pink-200 inline-block font-bold">🏷️ ${activeTemplate['備註']}</div>` : '';
+        const decoupled = monthShifts.find(s => s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] === 'SYS_DECOUPLED');
+        
+        let templateHtml = '';
+        if (activeTemplate) {
+            templateHtml = `<div class="mt-2 text-[10px] bg-pink-100 text-pink-700 px-1 py-1 rounded border border-pink-200 font-bold leading-tight shadow-sm">🏷️ ${activeTemplate['備註']}</div>
+                            <button onclick="manualHolidayDecouple('${dateStr}')" class="mt-1 w-full text-[9px] bg-red-100 text-red-600 hover:bg-red-200 px-1 py-1 rounded border border-red-200 font-bold shadow-sm transition">✂️ 解除綁定</button>`;
+        } else if (decoupled) {
+            templateHtml = `<div class="mt-2 text-[9px] text-orange-500 font-bold bg-orange-50 px-1 py-1 rounded border border-orange-200 leading-tight">⚠️ 已與模板脫鉤</div>`;
+        }
 
         tbody += `<tr class="${rowClass} hover:bg-slate-50 transition border-b">`;
         tbody += `<td class="border-r p-2 ${dateColor} align-top w-32 shrink-0">
                     <div>${mm}/${String(d).padStart(2,'0')} (${dayOfWeek})</div>
-                    ${templateBadge}
-                    <div class="mt-2"><button onclick="guardHolidayTemplate('${dateStr}', () => openHolidayTaskModal('${dateStr}'))" class="text-[10px] bg-pink-100 text-pink-700 px-2 py-1 rounded shadow hover:bg-pink-200">+ 新增工作</button></div>
+                    ${templateHtml}
+                    <div class="mt-2"><button onclick="guardHolidayTemplate('${dateStr}', () => openHolidayTaskModal('${dateStr}'))" class="w-full text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1.5 rounded shadow hover:bg-indigo-200 font-bold">+ 新增工作</button></div>
                   </td>`;
         
         tbody += `<td class="p-2 flex flex-wrap gap-2">`;
@@ -74,12 +96,12 @@ function renderHolidayGrid() {
         } else {
             dailyShifts.forEach(shift => {
                 const optionsHTML = typeof buildEmpSelectOptions === 'function' ? buildEmpSelectOptions(deptStaffMap, shift['員工編號']) : '';
-                tbody += `<div class="bg-white border border-pink-200 rounded shadow-sm p-2 flex flex-col gap-1 w-40 shrink-0 relative">
+                tbody += `<div class="bg-white border border-pink-200 rounded shadow-sm p-2 flex flex-col gap-1 w-40 shrink-0 relative hover:border-pink-300 transition">
                     <div class="text-xs font-bold text-pink-800 flex justify-between items-center border-b border-pink-100 pb-1 mb-1">
                         <span class="truncate" title="${shift['工作名稱']}">${shift['工作名稱']}</span>
                         <button onclick="guardHolidayTemplate('${dateStr}', () => deleteHolidayShift('${shift['排班ID']}'))" class="text-red-400 hover:text-red-600 font-bold" title="刪除此工作">✖</button>
                     </div>
-                    <select class="w-full border p-1 rounded text-xs text-slate-700 focus:ring-1 focus:ring-pink-400"
+                    <select class="w-full border p-1 rounded text-xs text-slate-700 focus:ring-1 focus:ring-pink-400 font-bold"
                             onchange="guardHolidayTemplate('${dateStr}', () => updateHolidayEmp('${shift['排班ID']}', this.value))">
                         <option value="">--待指派--</option>
                         ${optionsHTML}
@@ -120,10 +142,55 @@ function toggleHolidayTargetInput() {
 }
 
 function renderHolidayTemplateSelect() {
-    const sel = document.getElementById('hApplyTempSelect');
-    if (!sel) return;
+    const selApply = document.getElementById('hApplyTempSelect');
+    const selUpdate = document.getElementById('hUpdateTempSelect');
+    if (!selApply) return;
+    
     const temps = (appData.templates || []).filter(t => t['部門'] === currentHolidayDept && t['類型'] === '假日');
-    sel.innerHTML = temps.length ? temps.map(t => `<option value="${t['模板ID']}">${t['模板名稱']}</option>`).join('') : '<option value="">(尚無假日模板)</option>';
+    const optionsHtml = temps.length ? temps.map(t => `<option value="${t['模板ID']}">${t['模板名稱']}</option>`).join('') : '<option value="">(尚無假日模板)</option>';
+    
+    selApply.innerHTML = optionsHtml;
+    
+    if (selUpdate) {
+        selUpdate.innerHTML = '<option value="">-- 建立全新模板 (另存) --</option>' + optionsHtml;
+    }
+}
+
+async function saveHolidayAsTemplate() {
+    const updateId = document.getElementById('hUpdateTempSelect').value;
+    const newName = document.getElementById('hNewTempName').value.trim();
+    const dateStr = document.getElementById('hSaveSourceDate').value;
+    
+    if (!dateStr) return alert('請選擇來源日期！');
+    
+    let targetId = updateId;
+    let targetName = newName;
+    
+    if (updateId) {
+        const tempInfo = appData.templates.find(t => t['模板ID'] === updateId);
+        if (tempInfo) targetName = newName || tempInfo['模板名稱'];
+    } else {
+        if (!newName) return alert('請輸入新模板名稱！');
+        targetId = 'TH' + new Date().getTime();
+    }
+    
+    const currentShifts = appData.shifts.filter(s => s['部門名稱'] === currentHolidayDept && s['日期'] === dateStr && !s['員工編號'].startsWith('SYS_'));
+    if (currentShifts.length === 0) return alert('該日無任何排班，無法存為模板。');
+    
+    document.body.style.cursor = 'wait';
+    await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ 
+            action: 'save_template', 
+            templateId: targetId, templateName: targetName, dept: currentHolidayDept, type: '假日', 
+            snapshot: JSON.stringify(currentShifts) 
+        })
+    });
+    showToast('💾 假日模板儲存/更新成功！');
+    document.getElementById('hNewTempName').value = '';
+    await reloadData(); renderHolidayTemplateSelect();
+    document.querySelector('input[value="apply"][name="hTempMode"]').click(); toggleHolidayTempMode();
+    document.body.style.cursor = 'default';
 }
 
 function addHolidayTempTargetDay() {
@@ -138,25 +205,6 @@ function renderHolidayTempTargetDays() {
     container.innerHTML = hTempTargetDaysList.map(date => `<span class="bg-pink-100 text-pink-800 text-xs px-2 py-1 rounded flex items-center gap-1 border border-pink-200 shadow-sm font-mono">${date} <button onclick="removeHolidayTempTargetDay('${date}')" class="text-red-500 hover:text-red-700 font-bold text-sm leading-none">×</button></span>`).join('');
 }
 
-async function saveHolidayAsTemplate() {
-    const name = document.getElementById('hNewTempName').value.trim();
-    const dateStr = document.getElementById('hSaveSourceDate').value;
-    if (!name || !dateStr) return alert('請選擇來源日期並輸入模板名稱！');
-    
-    const currentShifts = appData.shifts.filter(s => s['部門名稱'] === currentHolidayDept && s['日期'] === dateStr && !s['員工編號'].startsWith('SYS_'));
-    if (currentShifts.length === 0) return alert('該日無任何排班，無法存為模板。');
-    
-    document.body.style.cursor = 'wait';
-    await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'save_template', templateId: 'TH' + new Date().getTime(), templateName: name, dept: currentHolidayDept, type: '假日', snapshot: JSON.stringify(currentShifts) })
-    });
-    showToast('💾 假日模板儲存成功！');
-    document.getElementById('hNewTempName').value = '';
-    await reloadData(); renderHolidayTemplateSelect();
-    document.querySelector('input[value="apply"][name="hTempMode"]').click(); toggleHolidayTempMode();
-    document.body.style.cursor = 'default';
-}
 
 function executeApplyHolidayTemplate() {
     const tempId = document.getElementById('hApplyTempSelect').value;
