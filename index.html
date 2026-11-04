@@ -10,524 +10,263 @@
         .timeline-container { position: relative; height: 50px; background: #f8fafc; }
         .drop-zone { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
         .drop-zone.drag-over { background: rgba(59, 130, 246, 0.1); border: 2px dashed #3b82f6; }
-        .timeline-block { position: absolute; top: 5px; bottom: 5px; background: #dbeafe; border: 1px solid #60a5fa; border-radius: 6px; padding: 2px; display: flex; flex-direction: column; justify-content: center; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10; cursor: grab; overflow: hidden; transition: transform 0.1s; }
-        .timeline-block:active { cursor: grabbing; transform: scale(1.02); }
-        .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
+        .modal-overlay { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
     </style>
 </head>
-<body class="bg-slate-100 flex h-screen overflow-hidden text-slate-800 font-sans">
+<body class="bg-slate-50 flex h-screen overflow-hidden text-slate-800 font-sans">
 
     <!-- 左側選單 -->
-    <aside class="w-64 bg-slate-800 text-white flex flex-col shadow-lg z-20">
-        <div class="p-4 text-lg font-bold border-b border-slate-700 flex items-center gap-2">🏥 智能排班系統</div>
-        <div id="loginArea" class="p-4 border-b border-slate-700 bg-slate-900"><input type="text" id="loginId" placeholder="輸入員工編號" class="w-full text-black p-2 rounded mb-2 text-sm"><button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-500 rounded py-2 text-sm font-bold">登入系統</button></div>
-        <div id="userInfo" class="p-4 border-b border-slate-700 bg-slate-900 hidden flex justify-between items-center"><div class="text-green-400 text-sm font-bold" id="userNameDisplay"></div><button onclick="logout()" class="text-xs text-slate-400 hover:text-white underline">登出</button></div>
+    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-30 relative">
+        <div class="p-4 text-lg font-bold border-b border-slate-700 flex items-center gap-2 text-white">🏥 智能排班系統</div>
+        <div id="loginArea" class="p-4 border-b border-slate-700 bg-slate-800">
+            <input type="text" id="loginId" placeholder="輸入員工編號" class="w-full text-slate-900 p-2 rounded mb-2 text-sm font-bold shadow-inner focus:ring-2 focus:ring-blue-500 outline-none">
+            <button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-500 text-white rounded py-2 text-sm font-bold shadow-md transition">登入系統</button>
+        </div>
+        <div id="userInfo" class="p-4 border-b border-slate-700 bg-slate-800 hidden flex justify-between items-center">
+            <div class="text-green-400 text-sm font-bold flex items-center gap-1">👤 <span id="userNameDisplay"></span></div>
+            <button onclick="logout()" class="text-xs text-slate-400 hover:text-white underline">登出</button>
+        </div>
         
-        <div class="p-3 text-sm text-slate-400 font-bold bg-slate-800">📅 各單位班表總覽</div>
-        <ul id="publicDeptList" class="overflow-y-auto flex-1 px-2 space-y-1"></ul>
+        <div class="p-3 text-xs text-slate-500 font-bold bg-slate-900 uppercase tracking-wider">📅 各單位班表總覽</div>
+        <ul id="publicDeptList" class="overflow-y-auto flex-1 px-2 space-y-1 mt-1"></ul>
 
-        <div id="adminMenu" class="hidden flex-col border-t-2 border-slate-600 bg-slate-700 pb-4">
-            <div class="p-3 text-sm text-yellow-400 font-bold">⚙️ 排班管理與維護</div>
+        <div id="adminMenu" class="hidden flex-col border-t border-slate-700 bg-slate-800/50 pb-4">
+            <div class="p-3 text-xs text-yellow-500 font-bold uppercase tracking-wider">⚙️ 排班管理與維護</div>
             <ul id="adminDeptList" class="px-2 space-y-1 overflow-y-auto max-h-40 mb-2"></ul>
-            <hr class="border-slate-600 mx-2 mb-2">
+            <hr class="border-slate-700 mx-3 mb-2">
             <ul class="px-2 space-y-1">
-                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-yellow-200 text-sm font-bold transition" onclick="showEmployeeMaint()">🧑‍🤝‍🧑 全院員工名冊</li>
-                <li class="cursor-pointer p-2 hover:bg-slate-600 rounded text-green-300 text-sm font-bold transition" onclick="showTaskMaint()">📑 工作項目清單</li>
+                <li class="cursor-pointer p-2 hover:bg-slate-700 hover:text-white rounded text-yellow-200/80 text-sm font-bold transition flex items-center gap-2" onclick="showEmployeeMaint()">🧑‍🤝‍🧑 全院員工名冊</li>
+                <li class="cursor-pointer p-2 hover:bg-slate-700 hover:text-white rounded text-green-300/80 text-sm font-bold transition flex items-center gap-2" onclick="showTaskMaint()">📑 工作項目清單</li>
             </ul>
         </div>
     </aside>
 
-<!-- 頂部系統狀態列 -->
-    <div id="systemBar" class="fixed top-0 right-0 left-64 bg-white shadow-sm border-b px-6 py-2 flex justify-between items-center z-40">
+    <!-- 頂部系統狀態列 -->
+    <div id="systemBar" class="fixed top-0 right-0 left-64 bg-white/90 backdrop-blur-sm shadow-sm border-b px-6 py-2 flex justify-between items-center z-20">
         <div class="text-xs text-slate-500 font-bold flex items-center gap-2">
-            👁️ 系統總登入人次：<span id="sysViewCount" class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">0</span>
+            👁️ 系統總登入人次：<span id="sysViewCount" class="text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">0</span>
         </div>
-        
         <div class="flex items-center gap-4">
-            <!-- 暫存進度區塊 (當有異動時顯示) -->
             <div id="draftStatus" class="hidden flex items-center gap-2">
                 <span class="text-red-500 text-sm font-bold animate-pulse mr-2">⚠️ 尚有變更未儲存</span>
-                <button onclick="saveDraftsToCloud()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded text-sm font-bold shadow transition">💾 暫存進度</button>
+                <button onclick="saveDraftsToCloud()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded text-sm font-bold shadow-sm transition">💾 暫存進度</button>
             </div>
-            <!-- 獨立的發佈版本按鈕 (常駐) -->
-            <button onclick="publishVersion()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 rounded text-sm font-bold shadow transition border border-blue-700">🚀 發佈新版本</button>
+            <button onclick="publishVersion()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 rounded text-sm font-bold shadow-sm transition border border-blue-700">🚀 發佈新版本</button>
         </div>
     </div>
 
     <!-- 主內容區 -->
-    <main id="mainContent" class="flex-1 p-6 pt-12 overflow-y-auto relative w-full">
-        <div id="statusToast" class="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg hidden z-50 transition-opacity font-bold">操作成功</div>
+    <main id="mainContent" class="flex-1 p-6 pt-16 overflow-y-auto relative w-full bg-slate-50/50">
+        <div id="statusToast" class="fixed top-16 right-6 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-xl hidden z-50 transition-opacity font-bold border border-slate-700 flex items-center gap-2"></div>
         
         <div id="welcomeMsg" class="flex flex-col items-center justify-center h-full text-slate-400">
-            <div class="text-6xl mb-4">👋</div><div class="text-2xl font-bold">歡迎使用，請選擇部門</div>
+            <div class="text-6xl mb-4 opacity-50">👋</div><div class="text-2xl font-bold">歡迎使用，請於左側選擇功能</div>
         </div>
         
-        <!-- 公開檢視 (加入上下備註顯示) -->
+        <!-- 公開檢視 -->
         <div id="publicView" class="hidden h-full flex flex-col">
             <div class="flex justify-between items-center mb-4">
-                <h2 id="publicTitle" class="text-2xl font-bold text-slate-700"></h2>
-                <input type="date" id="publicDate" class="border p-2 rounded" onchange="renderPublicChart()">
+                <h2 id="publicTitle" class="text-2xl font-bold text-slate-800 border-l-4 border-blue-500 pl-3"></h2>
+                <input type="date" id="publicDate" class="border p-2 rounded shadow-sm font-bold text-slate-700" onchange="renderPublicChart()">
             </div>
-            <div id="publicTopRemark" class="bg-yellow-100 text-yellow-800 p-2 rounded mb-2 font-bold hidden border border-yellow-300"></div>
-            <div id="timeline_chart" class="bg-white p-4 shadow rounded flex-1 min-h-[400px]"></div>
-            <div id="publicBottomRemark" class="bg-yellow-100 text-yellow-800 p-2 rounded mt-2 font-bold hidden border border-yellow-300"></div>
+            <div id="publicTopRemark" class="bg-yellow-50 text-yellow-800 p-3 rounded-lg mb-3 font-bold hidden border border-yellow-200 shadow-sm flex items-center gap-2"></div>
+            <div id="timeline_chart" class="bg-white p-4 shadow-sm border border-slate-200 rounded-lg flex-1 min-h-[400px]"></div>
+            <div id="publicBottomRemark" class="bg-yellow-50 text-yellow-800 p-3 rounded-lg mt-3 font-bold hidden border border-yellow-200 shadow-sm flex items-center gap-2"></div>
         </div>
 
-<!-- 假日/行事曆排班模式 -->
-        <div id="holidayAdminView" class="hidden">
-            <h2 class="text-2xl font-bold mb-4 text-pink-700 border-b-2 border-pink-200 pb-2">🌴 行事曆排班模式 (以工作為導向)</h2>
-            
-            <!-- 上方控制列：選擇部門、月份、篩選 -->
-            <div class="bg-white p-4 rounded shadow mb-4 flex flex-wrap gap-4 items-end border-l-4 border-pink-500">
-                <div><label class="block text-xs font-bold text-slate-500">選擇排班部門</label><select id="holidayDeptSelect" class="border p-2 rounded w-40 font-bold" onchange="renderHolidayGrid()"></select></div>
-                <div><label class="block text-xs font-bold text-slate-500">選擇排班月份</label><input type="month" id="holidayMonth" class="border p-2 rounded w-36 font-bold" onchange="renderHolidayGrid()"></div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500">篩選排班類別</label>
-                    <select id="holidayCatFilter" class="border p-2 rounded w-40 font-bold text-pink-700 bg-pink-50" onchange="renderHolidayGrid()">
-                        <option value="ALL">全部顯示</option>
-                        <option value="假日班(常規)">假日班(常規)</option>
-                        <option value="假日班(補充)">假日班(補充)</option>
-                        <option value="假日班(特殊)">假日班(特殊)</option>
-                        <option value="工作日(常規)">工作日(常規)</option>
-                        <option value="工作日(補充)">工作日(補充)</option>
-                        <option value="工作日(特殊)">工作日(特殊)</option>
-                    </select>
+        <!-- 🌟 大統一：排班與模板管理中心 -->
+        <div id="adminView" class="hidden flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+            <div class="flex justify-between items-end mb-4 border-b pb-3">
+                <h2 id="adminTitle" class="text-2xl font-bold text-slate-800 border-l-4 border-indigo-600 pl-3"></h2>
+                <div class="flex gap-1 bg-slate-100 p-1.5 rounded-lg border border-slate-200 shadow-inner">
+                    <button id="tabDaily" onclick="switchAdminTab('daily')" class="px-6 py-2 rounded font-bold transition shadow-sm bg-white text-blue-700 border border-slate-300">📅 班表總覽與套用</button>
+                    <button id="tabTemplate" onclick="switchAdminTab('template')" class="px-6 py-2 rounded font-bold transition text-slate-500 hover:text-slate-700 hover:bg-slate-200 border border-transparent">🏷️ 模板設計與維護</button>
                 </div>
             </div>
 
-
-<!-- 🌟 全新大統一：排班與模板管理中心 -->
-    <div id="adminView" class="hidden flex flex-col h-full bg-slate-50 rounded-lg p-2">
-        <div class="flex justify-between items-end mb-4 border-b pb-2">
-            <h2 id="adminTitle" class="text-2xl font-bold text-slate-800 border-l-4 border-indigo-600 pl-3"></h2>
-            
-            <!-- 💡 頂層頁籤切換：日常總覽 vs 模板庫 -->
-            <div class="flex gap-1 bg-slate-200 p-1 rounded-lg border border-slate-300 shadow-inner">
-                <button id="tabDaily" onclick="switchAdminTab('daily')" class="px-6 py-2 rounded-md font-bold transition shadow-sm bg-white text-blue-700">📅 班表總覽與套用</button>
-                <button id="tabTemplate" onclick="switchAdminTab('template')" class="px-6 py-2 rounded-md font-bold transition text-slate-600 hover:bg-white/50">🏷️ 模板設計與維護</button>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- 頁籤 A：📅 班表總覽與套用 -->
-        <!-- ========================================== -->
-        <div id="viewDaily" class="flex flex-col h-full gap-3">
-            <!-- 進階套用引擎面板 -->
-            <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-200 shadow-sm flex flex-wrap gap-4 items-end">
-                <div>
-                    <label class="block text-xs font-bold text-indigo-700 mb-1">1. 選擇來源模板</label>
-                    <select id="engineTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-slate-700 shadow-sm"></select>
-                </div>
-                <div class="text-xl text-indigo-300 font-bold mb-1">➡️</div>
-                <div>
-                    <label class="block text-xs font-bold text-indigo-700 mb-1">2. 套用目標月份</label>
-                    <input type="month" id="engineTargetMonth" class="border p-1.5 rounded bg-white font-bold text-slate-700 shadow-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-indigo-700 mb-1">3. 目標條件 (可複選)</label>
-                    <div class="flex gap-3 bg-white p-1.5 rounded border shadow-sm">
-                        <label class="text-sm font-bold flex items-center gap-1 cursor-pointer"><input type="checkbox" name="engineRule" value="weekday" checked>平日(一~五)</label>
-                        <span class="text-slate-300">|</span>
-                        <label class="text-sm font-bold flex items-center gap-1 text-pink-600 cursor-pointer"><input type="checkbox" name="engineRule" value="6">六</label>
-                        <label class="text-sm font-bold flex items-center gap-1 text-pink-600 cursor-pointer"><input type="checkbox" name="engineRule" value="0">日</label>
-                        <span class="text-slate-300">|</span>
-                        <label class="text-sm font-bold flex items-center gap-1 text-teal-600 cursor-pointer" onclick="toggleEngineSpecificDates()">特定自訂日期...</label>
+            <!-- 頁籤 A：📅 班表總覽與套用 -->
+            <div id="viewDaily" class="flex flex-col h-full gap-4">
+                <div class="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100 flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-bold text-indigo-700 mb-1">1. 選擇來源模板</label>
+                        <select id="engineTempSelect" class="border p-2 rounded bg-white w-56 font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-indigo-400 outline-none"></select>
                     </div>
+                    <div class="text-xl text-indigo-300 font-bold mb-1">➡️</div>
+                    <div>
+                        <label class="block text-xs font-bold text-indigo-700 mb-1">2. 套用目標月份</label>
+                        <input type="month" id="engineTargetMonth" class="border p-2 rounded bg-white font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-indigo-700 mb-1">3. 目標條件 (可複選)</label>
+                        <div class="flex gap-3 bg-white p-2 rounded border shadow-sm items-center h-[42px]">
+                            <label class="text-sm font-bold flex items-center gap-1 cursor-pointer"><input type="checkbox" name="engineRule" value="weekday" checked>平日(一~五)</label>
+                            <span class="text-slate-300">|</span>
+                            <label class="text-sm font-bold flex items-center gap-1 text-pink-600 cursor-pointer"><input type="checkbox" name="engineRule" value="6">六</label>
+                            <label class="text-sm font-bold flex items-center gap-1 text-pink-600 cursor-pointer"><input type="checkbox" name="engineRule" value="0">日</label>
+                            <span class="text-slate-300">|</span>
+                            <label class="text-sm font-bold flex items-center gap-1 text-teal-600 cursor-pointer hover:bg-teal-50 px-1 rounded transition" onclick="toggleEngineSpecificDates()">特定自訂日期...</label>
+                        </div>
+                    </div>
+                    <div class="flex-1"></div>
+                    <button onclick="executeAdvancedApply()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded font-bold shadow-md flex items-center gap-2 h-[42px] transition">🚀 執行套用</button>
                 </div>
-                <button onclick="executeAdvancedApply()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-1.5 rounded font-bold shadow-md flex items-center gap-2">🚀 執行套用 (覆蓋並脫鉤)</button>
-            </div>
-            
-            <!-- 隱藏的特定日期選擇器 -->
-            <div id="engineSpecificDatesPanel" class="hidden bg-teal-50 p-2 rounded border border-teal-200 flex items-center gap-2">
-                <span class="text-xs font-bold text-teal-800">特定日期加入清單：</span>
-                <input type="date" id="engineSpecificDateInput" class="border p-1 rounded text-sm">
-                <button onclick="addEngineSpecificDate()" class="bg-teal-600 text-white px-2 py-1 rounded text-xs font-bold shadow-sm">➕ 加入</button>
-                <div id="engineSpecificDatesList" class="flex flex-wrap gap-1 ml-2"></div>
+                
+                <div id="engineSpecificDatesPanel" class="hidden bg-teal-50 p-3 rounded-lg border border-teal-200 flex items-center gap-3 shadow-inner">
+                    <span class="text-sm font-bold text-teal-800">特定日期加入清單：</span>
+                    <input type="date" id="engineSpecificDateInput" class="border p-1.5 rounded text-sm font-bold shadow-sm">
+                    <button onclick="addEngineSpecificDate()" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition">➕ 加入</button>
+                    <div id="engineSpecificDatesList" class="flex flex-wrap gap-2 ml-2 border-l border-teal-200 pl-4 min-h-[30px] items-center"></div>
+                </div>
+
+                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-200 shadow-sm shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-slate-200 p-1 rounded-md flex gap-1 border border-slate-300 shadow-inner">
+                            <button id="btnViewTimeline" onclick="switchViewMode('timeline')" class="px-4 py-1.5 rounded text-sm font-bold bg-white text-blue-600 shadow-sm border border-slate-200 transition">⏳ 時間軸視圖 (單日)</button>
+                            <button id="btnViewMatrix" onclick="switchViewMode('matrix')" class="px-4 py-1.5 rounded text-sm font-bold text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent transition">📊 任務矩陣視圖 (全月)</button>
+                        </div>
+                        <input type="date" id="viewTimelineDate" class="border p-2 rounded text-sm font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-400 outline-none" onchange="renderUnifiedGrid()">
+                        <div id="viewMatrixFilters" class="hidden items-center gap-2">
+                            <input type="month" id="viewMatrixMonth" class="border p-2 rounded text-sm font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-400 outline-none" onchange="renderUnifiedGrid()">
+                            <select id="viewMatrixDow" class="border p-2 rounded text-sm font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-400 outline-none" onchange="renderUnifiedGrid()">
+                                <option value="ALL">所有日子</option>
+                                <option value="1,2,3,4,5">僅平日 (一~五)</option>
+                                <option value="6,0">僅假日 (六,日)</option>
+                                <option value="6">僅星期六</option>
+                                <option value="0">僅星期日</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="dailyTemplateStatus" class="flex items-center gap-2"></div>
+                </div>
             </div>
 
-            <!-- 視圖控制列 -->
-            <div class="flex justify-between items-center bg-white p-2 rounded-lg border shadow-sm shrink-0">
-                <div class="flex items-center gap-3">
-                    <div class="bg-slate-100 p-1 rounded flex gap-1 border">
-                        <button id="btnViewTimeline" onclick="switchViewMode('timeline')" class="px-3 py-1 rounded text-sm font-bold bg-white text-blue-600 shadow-sm">⏳ 時間軸視圖 (單日)</button>
-                        <button id="btnViewMatrix" onclick="switchViewMode('matrix')" class="px-3 py-1 rounded text-sm font-bold text-slate-500 hover:bg-slate-200">📊 任務矩陣視圖 (多日)</button>
-                    </div>
-                    <!-- 時間軸專用日期 -->
-                    <input type="date" id="viewTimelineDate" class="border p-1.5 rounded text-sm font-bold text-slate-700" onchange="renderUnifiedGrid()">
-                    <!-- 矩陣專用篩選 (預設隱藏) -->
-                    <div id="viewMatrixFilters" class="hidden items-center gap-2">
-                        <input type="month" id="viewMatrixMonth" class="border p-1.5 rounded text-sm font-bold text-slate-700" onchange="renderUnifiedGrid()">
-                        <select id="viewMatrixDow" class="border p-1.5 rounded text-sm font-bold text-slate-700" onchange="renderUnifiedGrid()">
-                            <option value="ALL">所有日子</option>
-                            <option value="1,2,3,4,5">僅平日 (一~五)</option>
-                            <option value="6,0">僅假日 (六,日)</option>
-                            <option value="6">僅星期六</option>
-                            <option value="0">僅星期日</option>
+            <!-- 頁籤 B：🏷️ 模板設計與維護 -->
+            <div id="viewTemplate" class="hidden flex flex-col h-full gap-4">
+                <div class="bg-purple-50 p-4 rounded-lg border border-purple-200 shadow-sm flex flex-wrap items-end gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-purple-700 mb-1">編輯現有模板</label>
+                        <select id="studioTempSelect" class="border p-2 rounded bg-white w-56 font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-purple-400 outline-none" onchange="loadTemplateToStudio()">
+                            <option value="new">-- ✨ 建立全新模板 --</option>
                         </select>
                     </div>
+                    <div class="h-8 w-px bg-purple-200 mx-2"></div>
+                    <div>
+                        <label class="block text-xs font-bold text-purple-700 mb-1">模板名稱</label>
+                        <input type="text" id="studioTempName" placeholder="如：常規白班 / 颱風特別班..." class="border p-2 rounded bg-white w-64 font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-purple-400 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-purple-700 mb-1">自訂分類標籤</label>
+                        <input type="text" id="studioTempCat" placeholder="如：平日、假日、颱風..." class="border p-2 rounded bg-white w-32 font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-purple-400 outline-none" list="tempCatList">
+                        <datalist id="tempCatList"><option value="平日"><option value="假日"><option value="颱風"><option value="連假"></datalist>
+                    </div>
+                    <div class="flex-1"></div>
+                    <button onclick="deleteCurrentTemplate()" class="text-red-500 hover:text-red-700 font-bold text-sm underline mr-4 transition">🗑️ 刪除此模板</button>
+                    <button onclick="saveTemplateFromStudio()" class="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded font-bold shadow-md flex items-center gap-2 h-[42px] transition">💾 儲存 / 另存模板</button>
                 </div>
-                <div id="dailyTemplateStatus" class="flex items-center gap-2"></div>
+                <div class="flex items-center gap-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-sm font-bold text-yellow-800 shadow-sm">
+                    <span class="text-xl">💡</span> <span>沙盒模式：下方畫布的所有修改，只會存在於當前模板中，完全不會影響真實的每日班表。</span>
+                    <button onclick="handleUnifiedAction('add_shift', 'TEMPLATE')" class="ml-auto bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded font-bold shadow-sm transition flex items-center gap-1">➕ 新增模板工作</button>
+                </div>
             </div>
+
+            <!-- 🎨 大統一畫布 (共用渲染區) -->
+            <div id="unifiedGrid" class="bg-slate-50 rounded-lg shadow-inner flex-1 overflow-auto border-2 border-slate-200 mt-2"></div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- 頁籤 B：🏷️ 模板設計與維護 -->
-        <!-- ========================================== -->
-        <div id="viewTemplate" class="hidden flex flex-col h-full gap-3">
-            <div class="bg-purple-50 p-3 rounded-lg border border-purple-200 shadow-sm flex flex-wrap items-end gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-purple-700 mb-1">編輯現有模板</label>
-                    <select id="studioTempSelect" class="border p-1.5 rounded bg-white w-48 font-bold text-slate-700 shadow-sm" onchange="loadTemplateToStudio()">
-                        <option value="new">-- ✨ 建立全新模板 --</option>
-                    </select>
-                </div>
-                <div class="h-8 w-px bg-purple-200 mx-2"></div>
-                <div>
-                    <label class="block text-xs font-bold text-purple-700 mb-1">模板名稱</label>
-                    <input type="text" id="studioTempName" placeholder="如：常規白班 / 颱風特別班..." class="border p-1.5 rounded bg-white w-56 font-bold text-slate-800 shadow-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-purple-700 mb-1">自訂分類標籤</label>
-                    <input type="text" id="studioTempCat" placeholder="如：平日、假日、颱風..." class="border p-1.5 rounded bg-white w-32 font-bold text-slate-800 shadow-sm" list="tempCatList">
-                    <datalist id="tempCatList"><option value="平日"><option value="假日"><option value="颱風"><option value="連假"></datalist>
-                </div>
-                <div class="flex-1"></div>
-                <button onclick="deleteCurrentTemplate()" class="text-red-500 hover:text-red-700 font-bold text-sm underline mr-2">🗑️ 刪除此模板</button>
-                <button onclick="saveTemplateFromStudio()" class="bg-teal-600 hover:bg-teal-700 text-white px-6 py-1.5 rounded font-bold shadow flex items-center gap-2">💾 儲存 / 另存模板</button>
-            </div>
-            
-            <div class="flex items-center gap-2 bg-yellow-50 p-2 rounded border border-yellow-200 text-sm font-bold text-yellow-800">
-                <span>💡 沙盒模式：下方畫布的所有修改，只會存在於當前模板中，不會影響實際班表。</span>
-                <button onclick="handleUnifiedAction('add_shift', 'TEMPLATE')" class="ml-auto bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded shadow-sm text-xs">➕ 新增模板工作</button>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- 🎨 大統一畫布 (共用渲染區) -->
-        <!-- ========================================== -->
-        <div id="unifiedGrid" class="bg-white rounded-lg shadow-md flex-1 overflow-auto border border-slate-300 min-h-[400px]"></div>
-    </div>
-
-<!-- 維護畫面 -->
+        <!-- 維護畫面 -->
         <div id="employeeAdminView" class="hidden">
-            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2 flex items-center gap-4">
-                🧑‍🤝‍🧑 員工名冊維護
-                <span id="empListCount" class="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold shadow-sm border border-blue-200">共 0 人</span>
+            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2 flex items-center gap-4 text-slate-800">
+                🧑‍🤝‍🧑 員工名冊維護 <span id="empListCount" class="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold shadow-sm border border-blue-200">共 0 人</span>
             </h2>
-            
-            <div class="flex flex-wrap gap-4 mb-4 bg-white p-4 rounded shadow-sm border-l-4 border-blue-500">
+            <div class="flex flex-wrap gap-4 mb-4 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
                 <div>
-                    <label class="block text-xs font-bold text-slate-500">所屬單位</label>
-                    <select id="empDeptFilter" onchange="renderEmployeeList()" class="border p-2 rounded w-32 font-bold text-blue-800">
-                        <option value="ALL">全部單位</option>
-                        <option value="藥學部" selected>藥學部</option>
-                        <option value="離職">離職</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500">所屬類別</label>
-                    <select id="empCatFilter" onchange="renderEmployeeList()" class="border p-2 rounded w-32 font-bold text-blue-800"></select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500">所屬組別</label>
-                    <select id="empGroupFilter" onchange="renderEmployeeList()" class="border p-2 rounded w-40 font-bold text-blue-800"></select>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">所屬單位</label>
+                    <select id="empDeptFilter" onchange="renderEmployeeList()" class="border p-2 rounded w-32 font-bold text-slate-700 focus:ring-2 focus:ring-blue-400 outline-none"><option value="ALL">全部單位</option><option value="藥學部" selected>藥學部</option><option value="離職">離職</option></select>
                 </div>
                 <div class="flex-1">
-                    <label class="block text-xs font-bold text-slate-500">模糊搜尋</label>
-                    <input type="text" id="empSearchInput" onkeyup="renderEmployeeList()" placeholder="🔍 搜尋編號、姓名或關鍵字..." class="w-full border p-2 rounded shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">人員搜尋</label>
+                    <input type="text" id="empSearchInput" onkeyup="renderEmployeeList()" placeholder="🔍 輸入編號或姓名搜尋..." class="w-full border p-2 rounded shadow-sm focus:ring-2 focus:ring-blue-400 font-bold outline-none text-slate-700">
                 </div>
             </div>
-            
-            <div class="bg-white rounded shadow p-4">
-                <table class="min-w-full text-sm text-left">
-                    <thead class="bg-slate-100"><tr><th class="p-2">編號</th><th class="p-2">姓名</th><th class="p-2">所屬類別</th><th class="p-2">所屬組別</th><th class="p-2">操作</th></tr></thead>
-                    <tbody id="empTableBody"></tbody>
-                </table>
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <table class="min-w-full text-sm text-left"><thead class="bg-slate-100 border-b"><tr><th class="p-3">編號</th><th class="p-3">姓名</th><th class="p-3">所屬組別</th><th class="p-3 text-center">操作</th></tr></thead><tbody id="empTableBody"></tbody></table>
             </div>
         </div>
-        <div id="taskAdminView" class="hidden">
-            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2">📑 工作項目清單</h2>
-            
-            <div class="flex gap-4 mb-4">
-                <select id="taskDeptFilter" onchange="renderTaskList()" class="border p-2 rounded w-1/4 shadow-sm font-bold text-indigo-800"></select>
-                <input type="text" id="taskSearchInput" onkeyup="renderTaskList()" placeholder="🔍 搜尋工作名稱..." class="w-1/3 border p-2 rounded shadow-sm">
-                <select id="taskCatFilter" onchange="renderTaskList()" class="border p-2 rounded w-1/4 shadow-sm font-bold text-blue-800">
-                    <option value="ALL">全部類別</option>
-                    <option value="工作日">僅看工作日</option>
-                    <option value="假日班">僅看假日班</option>
-                </select>
-            </div>
 
-            <div class="bg-white p-4 rounded shadow mb-4 flex gap-4 items-end border-l-4 border-blue-500">
+        <div id="taskAdminView" class="hidden">
+            <h2 class="text-2xl font-bold mb-4 border-b-2 pb-2 text-slate-800">📑 工作項目維護</h2>
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-4 flex gap-4 items-end bg-indigo-50/30">
                 <input type="hidden" id="editTaskId">
-                <div><label class="block text-xs font-bold text-slate-500">工作名稱</label><input type="text" id="newTaskName" class="border p-2 rounded w-48 font-bold text-blue-800" placeholder="輸入工作名稱"></div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500">預設類別</label>
-                    <select id="newTaskCat" class="border p-2 rounded w-40 font-bold">
-                        <option value="工作日(常規)">工作日(常規)</option><option value="工作日(補充)">工作日(補充)</option><option value="工作日(特殊)">工作日(特殊)</option>
-                        <option value="假日班(常規)">假日班(常規)</option><option value="假日班(補充)">假日班(補充)</option><option value="假日班(特殊)">假日班(特殊)</option>
-                    </select>
-                </div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">部門</label><select id="taskDeptFilter" class="border p-2 rounded w-32 font-bold text-indigo-700"></select></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">工作名稱</label><input type="text" id="newTaskName" class="border p-2 rounded w-48 font-bold text-slate-800 placeholder-slate-400" placeholder="輸入名稱..."></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">預設類別</label><select id="newTaskCat" class="border p-2 rounded w-36 font-bold text-slate-700"><option value="常規">常規</option><option value="特殊">特殊</option></select></div>
                 <div class="flex gap-2">
-                    <button onclick="saveTask()" id="btnSaveTask" class="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-blue-700">➕ 新增</button>
-                    <button onclick="resetTaskForm()" id="btnCancelTask" class="hidden bg-slate-200 text-slate-700 px-4 py-2 rounded font-bold hover:bg-slate-300">取消編輯</button>
+                    <button onclick="saveTask()" id="btnSaveTask" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-bold shadow-sm transition">➕ 新增 / 儲存</button>
+                    <button onclick="resetTaskForm()" id="btnCancelTask" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded font-bold transition">取消</button>
                 </div>
             </div>
-            
-            <div class="bg-white rounded shadow p-4"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100"><tr><th class="p-2">所屬部門</th><th class="p-2">工作名稱</th><th class="p-2">預設類別</th><th class="p-2">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden"><table class="min-w-full text-sm text-left"><thead class="bg-slate-100 border-b"><tr><th class="p-3">部門</th><th class="p-3">工作名稱</th><th class="p-3">預設類別</th><th class="p-3 text-center">操作</th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
         </div>
     </main>
 
+    <!-- 🌟 共用 Modal 元件群 -->
+    
     <!-- 班表編輯 Modal -->
     <div id="shiftModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
-        <div class="bg-white rounded-lg shadow-xl w-[450px] p-6">
-            <h3 class="text-xl font-bold mb-4 text-blue-700" id="modalTitle">新增/編輯工作</h3>
+        <div class="bg-white rounded-xl shadow-2xl w-[450px] p-6 border border-slate-200">
+            <h3 class="text-xl font-bold mb-5 text-blue-800 flex items-center gap-2 border-b pb-2" id="modalTitle">新增/編輯工作</h3>
             <input type="hidden" id="modalShiftId">
-            <div class="space-y-3">
-                <div class="flex gap-2">
+            <div class="space-y-4">
+                <div class="flex gap-3">
                     <div class="w-1/2">
-                        <label class="text-sm font-bold">人員</label>
+                        <label class="text-xs font-bold text-slate-500 block mb-1">指派人員</label>
                         <input type="hidden" id="modalEmp">
-                        <button type="button" onclick="openStaffPicker(document.getElementById('modalEmp').value, currentDept, (newEmp) => updateModalEmp(newEmp))" class="w-full border p-2 rounded bg-white text-left font-bold text-slate-700 flex justify-between items-center shadow-sm">
+                        <button type="button" onclick="openStaffPicker(document.getElementById('modalEmp').value, currentDept, (newEmp) => updateModalEmp(newEmp))" class="w-full border-2 border-blue-200 hover:border-blue-400 p-2 rounded-lg bg-blue-50/30 text-left font-bold text-slate-800 flex justify-between items-center transition focus:outline-none focus:ring-2 focus:ring-blue-300">
                             <span id="txtModalEmp"></span> <span class="text-slate-400">🔍</span>
                         </button>
                     </div>
-                    <div class="w-1/2"><label class="text-sm font-bold">工作</label><select id="modalTask" class="w-full border p-2 rounded"></select></div>
+                    <div class="w-1/2">
+                        <label class="text-xs font-bold text-slate-500 block mb-1">選擇工作</label>
+                        <select id="modalTask" class="w-full border-2 border-slate-200 p-2 rounded-lg font-bold text-slate-800 focus:border-blue-400 focus:outline-none"></select>
+                    </div>
                 </div>
-                <div class="flex gap-2">
-                    <div class="w-1/2"><label class="text-sm font-bold">開始(HH:MM)</label><input type="time" id="modalStart" class="w-full border p-2 rounded"></div>
-                    <div class="w-1/2"><label class="text-sm font-bold">結束(HH:MM)</label><input type="time" id="modalEnd" class="w-full border p-2 rounded"></div>
+                <div class="flex gap-3">
+                    <div class="w-1/2"><label class="text-xs font-bold text-slate-500 block mb-1">開始(HH:MM)</label><input type="time" id="modalStart" class="w-full border-2 border-slate-200 p-2 rounded-lg font-bold text-slate-700"></div>
+                    <div class="w-1/2"><label class="text-xs font-bold text-slate-500 block mb-1">結束(HH:MM)</label><input type="time" id="modalEnd" class="w-full border-2 border-slate-200 p-2 rounded-lg font-bold text-slate-700"></div>
                 </div>
-                <div><label class="text-sm font-bold">類別</label>
-                    <select id="modalCat" class="w-full border p-2 rounded">
-                        <option value="工作日(常規)">工作日(常規)</option><option value="工作日(補充)">工作日(補充)</option><option value="工作日(特殊)">工作日(特殊)</option>
-                        <option value="假日班(常規)">假日班(常規)</option><option value="假日班(補充)">假日班(補充)</option><option value="假日班(特殊)">假日班(特殊)</option>
-                    </select>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 block mb-1">工作類別</label>
+                    <select id="modalCat" class="w-full border-2 border-slate-200 p-2 rounded-lg font-bold text-slate-700"><option value="常規">常規</option><option value="特殊">特殊</option></select>
                 </div>
-                <div><label class="text-sm font-bold text-blue-600">前方備註 (給個人的註解)</label><input type="text" id="modalRemark1" class="w-full border p-2 rounded bg-blue-50"></div>
-                <div><label class="text-sm font-bold text-teal-600">後方備註 (工作的補充說明)</label><input type="text" id="modalRemark2" class="w-full border p-2 rounded bg-teal-50"></div>
+                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
+                    <div><label class="text-xs font-bold text-blue-600 block mb-1">前方備註 (給個人的註解)</label><input type="text" id="modalRemark1" class="w-full border p-2 rounded bg-white text-sm font-bold placeholder-slate-300" placeholder="輸入備註..."></div>
+                    <div><label class="text-xs font-bold text-teal-600 block mb-1">後方備註 (工作的補充說明)</label><input type="text" id="modalRemark2" class="w-full border p-2 rounded bg-white text-sm font-bold placeholder-slate-300" placeholder="補充說明..."></div>
+                </div>
             </div>
-            <div class="mt-6 flex justify-between">
-                <button onclick="deleteShift()" id="btnDeleteShift" class="text-red-500 font-bold hover:bg-red-50 px-3 py-1 rounded">刪除</button>
+            <div class="mt-6 flex justify-between items-center border-t pt-4">
+                <button onclick="deleteShift()" id="btnDeleteShift" class="text-red-500 font-bold hover:bg-red-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-200 transition">🗑️ 刪除</button>
                 <div class="space-x-2">
-                    <button onclick="closeShiftModal()" class="px-4 py-2 border rounded font-bold text-slate-600">取消</button>
-                    <button onclick="saveShift()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">儲存</button>
+                    <button onclick="closeShiftModal()" class="px-5 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-bold text-slate-600 transition">取消</button>
+                    <button onclick="saveShift()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition">確認儲存</button>
                 </div>
             </div>
         </div>
     </div>
 
-<!-- 員工快速編輯 Modal (修改時間格式與唯讀) -->
-    <div id="quickEmpModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
-        <div class="bg-white rounded-lg shadow-xl w-[450px] p-6">
-            <h3 class="text-xl font-bold mb-4 text-teal-700 flex justify-between">
-                <span>👤 編輯人員設定</span><span id="qEmpName" class="text-slate-500"></span>
-            </h3>
-            <input type="hidden" id="qEmpId">
-            <div class="space-y-3">
-                <div class="flex gap-2">
-                    <div class="w-1/2">
-                        <label class="text-sm font-bold">所屬單位</label>
-                        <select id="qDept" class="w-full border p-2 rounded" onchange="handleDeptChange(this.value)">
-                            <option value="藥學部">藥學部</option>
-                            <option value="離職">離職</option>
-                        </select>
-                    </div>
-                    <div class="w-1/2"><label class="text-sm font-bold">權限</label><input type="text" id="qAuth" class="w-full border p-2 rounded"></div>
-                </div>
-                <div class="flex gap-2">
-                    <div class="w-1/2">
-                        <label class="text-sm font-bold text-slate-500">啟用時間 (系統紀錄，唯讀)</label>
-                        <div id="qStartDisplay" class="w-full p-2 bg-slate-100 border border-slate-200 rounded text-slate-500 text-sm"></div>
-                        <input type="hidden" id="qStart">
-                    </div>
-                    <div class="w-1/2">
-                        <label class="text-sm font-bold">停用時間</label>
-                        <input type="datetime-local" step="1" id="qEnd" class="w-full border p-2 rounded">
-                    </div>
-                </div>
-                <div><label class="text-sm font-bold">所屬類別</label><select id="qCategory" class="w-full border p-2 rounded"><option value="">--選擇類別--</option><option value="部本部">部本部</option><option value="藥品調劑科">藥品調劑科</option><option value="臨床藥學科">臨床藥學科</option><option value="IRB">IRB</option></select></div>
-                <div><label class="text-sm font-bold">所屬組別</label><select id="qGroup" class="w-full border p-2 rounded"><option value="">--選擇組別--</option><option value="門診藥局">門診藥局</option><option value="藥品調劑科">藥品調劑科</option><option value="藥學部">藥學部</option><option value="調配藥局">調配藥局</option><option value="正確用藥推廣組">正確用藥推廣組</option><option value="藥物諮詢組">藥物諮詢組</option><option value="急診藥局">急診藥局</option><option value="住院藥局">住院藥局</option><option value="智能運管組">智能運管組</option><option value="臨床藥學科">臨床藥學科</option><option value="藥品管理組">藥品管理組</option><option value="藥學教育組">藥學教育組</option><option value="作業品質控管組">作業品質控管組</option><option value="藥事照護組">藥事照護組</option><option value="臨床試驗藥局">臨床試驗藥局</option><option value="IRB">IRB</option></select></div>
+    <!-- 人員模糊搜尋器 Modal -->
+    <div id="staffPickerModal" class="hidden fixed inset-0 z-[60] flex items-start justify-center pt-24 modal-overlay">
+        <div class="bg-white rounded-xl shadow-2xl w-[400px] flex flex-col max-h-[70vh] border border-slate-200">
+            <div class="p-4 border-b bg-slate-50 flex justify-between items-center rounded-t-xl">
+                <h3 class="font-bold text-slate-800 text-lg">🔍 搜尋並選擇人員</h3>
+                <button onclick="closeStaffPicker()" class="text-slate-400 hover:text-slate-700 font-bold text-2xl leading-none">&times;</button>
             </div>
-            <div class="mt-6 flex justify-end space-x-2">
-                <button onclick="document.getElementById('quickEmpModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600">取消</button>
-                <button onclick="saveQuickEmpEdit()" class="px-4 py-2 bg-teal-600 text-white rounded font-bold">儲存設定</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 行事曆新增工作 Modal -->
-    <div id="holidayTaskModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
-        <div class="bg-white rounded-lg shadow-xl w-[400px] p-6">
-            <h3 class="text-xl font-bold mb-4 text-pink-700">➕ 指派行事曆工作</h3>
-            <input type="hidden" id="hTaskDate">
-            <div class="space-y-4">
-                <div>
-                    <label class="text-sm font-bold text-slate-600">步驟 1：篩選工作類別</label>
-                    <select id="hTaskCat" class="w-full border p-2 rounded bg-pink-50" onchange="filterHolidayTaskOptions()">
-                        <option value="ALL">--顯示該部門所有工作--</option>
-                        <option value="假日班(常規)">假日班(常規)</option>
-                        <option value="假日班(補充)">假日班(補充)</option>
-                        <option value="假日班(特殊)">假日班(特殊)</option>
-                        <option value="工作日(常規)">工作日(常規)</option>
-                        <option value="工作日(補充)">工作日(補充)</option>
-                        <option value="工作日(特殊)">工作日(特殊)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-sm font-bold text-slate-600">步驟 2：選擇工作項目</label>
-                    <select id="hTaskSelect" class="w-full border p-2 rounded font-bold text-blue-800"></select>
-                </div>
-            </div>
-            <div class="mt-6 flex justify-end space-x-2">
-                <button onclick="document.getElementById('holidayTaskModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600">取消</button>
-                <button onclick="saveHolidayTask()" class="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded font-bold">確認新增</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 員工列 ⚙️ 整合操作面板 Modal -->
-    <div id="rowActionModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
-        <div class="bg-white rounded-lg shadow-xl w-96 p-6">
-            <h3 class="text-lg font-bold mb-4 text-blue-700 border-b pb-2 flex items-center gap-2">
-                ⚙️ 人員操作：<span id="raEmpName" class="text-slate-700"></span>
-            </h3>
-            <input type="hidden" id="raEmpId">
-            
-            <div class="space-y-4">
-                <!-- 選項 1：編輯屬性 -->
-                <button onclick="openQuickEmpFromAction()" class="w-full text-left p-3 rounded bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 transition shadow-sm border border-blue-100">
-                    ✏️ 1. 編輯人員屬性與到離職
-                </button>
-                
-                <!-- 選項 2：移交工作 -->
-                <div class="p-3 rounded border border-indigo-200 bg-indigo-50 shadow-sm">
-                    <div class="text-sm font-bold text-indigo-800 mb-2">🔄 2. 將工作移交給其他人：</div>
-                    <input type="hidden" id="raReplaceEmp">
-                    <button type="button" onclick="openStaffPicker('', currentDept, (newEmp) => { document.getElementById('raReplaceEmp').value = newEmp; document.getElementById('txtRaReplaceEmp').innerText = getEmpNameWithDefault(newEmp, '已選擇'); })" class="w-full border p-2 rounded bg-white text-left font-bold text-indigo-700 mb-2 flex justify-between items-center shadow-sm">
-                        <span id="txtRaReplaceEmp">-- 點擊搜尋接收人員 --</span> <span class="text-slate-400">🔍</span>
-                    </button>
-                    <div class="flex gap-2">
-                        <button onclick="replaceEmp('day')" class="flex-1 bg-indigo-500 text-white px-2 py-1.5 rounded text-xs font-bold shadow hover:bg-indigo-600">僅移交當日</button>
-                        <button onclick="replaceEmp('month')" class="flex-1 bg-indigo-700 text-white px-2 py-1.5 rounded text-xs font-bold shadow hover:bg-indigo-800">移交整個月份</button>
-                    </div>
-                </div>
-
-                <!-- 選項 3：刪除/清空 -->
-                <div class="p-3 rounded border border-red-200 bg-red-50 shadow-sm">
-                    <div class="text-sm font-bold text-red-800 mb-2">🗑️ 3. 移除/清空工作 (直接刪除)：</div>
-                    <div class="flex gap-2">
-                        <button onclick="clearEmpShifts('day')" class="flex-1 bg-red-400 text-white px-2 py-1.5 rounded text-xs font-bold shadow hover:bg-red-500">清空當日工作</button>
-                        <button onclick="clearEmpShifts('month')" class="flex-1 bg-red-600 text-white px-2 py-1.5 rounded text-xs font-bold shadow hover:bg-red-700">清空整個月份</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="mt-4 flex justify-end">
-                <button onclick="document.getElementById('rowActionModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600 hover:bg-slate-100">取消關閉</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 歷史版本與還原 Modal -->
-    <div id="historyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
-        <div class="bg-white rounded-lg shadow-xl w-[700px] max-h-[90vh] flex flex-col">
-            <div class="p-4 border-b bg-slate-50 flex justify-between items-center rounded-t-lg">
-                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
-                    🕒 <span id="historyModalTitle">版本歷史紀錄</span>
-                </h3>
-                <button onclick="document.getElementById('historyModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 font-bold text-xl">×</button>
-            </div>
-            
-            <div class="flex-1 overflow-y-auto p-4 flex gap-4 bg-slate-100">
-                <!-- 左側：版本清單 -->
-                <div class="w-1/3 bg-white border border-slate-200 rounded shadow-sm overflow-hidden flex flex-col">
-                    <div class="bg-slate-100 text-xs font-bold text-slate-500 p-2 border-b">發佈紀錄 (點擊檢視差異)</div>
-                    <ul id="historyList" class="overflow-y-auto flex-1 p-1 space-y-1"></ul>
-                </div>
-                
-                <!-- 右側：差異比對與還原操作 -->
-                <div class="w-2/3 bg-white border border-slate-200 rounded shadow-sm p-4 flex flex-col">
-                    <div id="historyDetailEmpty" class="flex-1 flex items-center justify-center text-slate-400 font-bold text-sm">
-                        請於左側選擇一個版本
-                    </div>
-                    <div id="historyDetailContent" class="hidden flex-1 flex flex-col">
-                        <div class="mb-3 border-b pb-2">
-                            <div class="text-sm font-bold text-blue-800" id="hdTime"></div>
-                            <div class="text-xs text-slate-500 mt-1">發佈人：<span id="hdAuthor"></span></div>
-                            <div class="text-xs text-slate-500 mt-1">備註：<span id="hdNote" class="text-slate-700 font-bold"></span></div>
-                        </div>
-                        <div class="text-xs font-bold text-slate-600 mb-2">相較於目前畫面班表之差異：</div>
-                        <div id="hdDiffList" class="flex-1 overflow-y-auto bg-slate-50 border p-2 rounded text-xs space-y-2"></div>
-                        
-                        <div class="mt-4 pt-3 border-t flex justify-end">
-                            <button id="btnRestore" onclick="restoreVersion()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-bold shadow flex items-center gap-2">
-                                ⚠️ 捨棄現狀，還原至此版本
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<!-- 承襲預覽確認 Modal -->
-    <div id="copyPreviewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
-        <div class="bg-white rounded-lg shadow-xl w-[600px] max-h-[90vh] flex flex-col">
-            <div class="p-4 border-b bg-slate-50 flex justify-between items-center rounded-t-lg">
-                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
-                    🔍 承襲覆蓋預覽 (Diff)
-                </h3>
-                <button onclick="document.getElementById('copyPreviewModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 font-bold text-xl">×</button>
-            </div>
-            <div class="p-4 flex-1 overflow-y-auto bg-slate-100">
-                <div class="text-sm font-bold text-red-600 mb-3 border-l-4 border-red-500 pl-2">
-                    ⚠️ 注意：執行承襲將會「完全覆蓋」目標日期的現有班表！
-                </div>
-                <!-- 差異清單渲染區 -->
-                <div id="copyPreviewContent" class="space-y-3"></div>
-            </div>
-            <div class="p-4 border-t flex justify-end gap-3 bg-white rounded-b-lg">
-                <button onclick="document.getElementById('copyPreviewModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600 hover:bg-slate-100">取消</button>
-                <button id="btnConfirmCopy" onclick="confirmCopyOverwrite()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded font-bold shadow flex items-center gap-2">
-                    ⚠️ 確認覆蓋並產生草稿
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 模板內容預覽 Modal -->
-    <div id="templatePreviewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
-        <div class="bg-white rounded-lg shadow-xl w-[500px] max-h-[80vh] flex flex-col">
-            <div class="p-4 border-b bg-slate-50 flex justify-between items-center rounded-t-lg">
-                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
-                    🔍 模板內容預覽：<span id="tpModalTitle" class="text-indigo-600"></span>
-                </h3>
-                <button onclick="document.getElementById('templatePreviewModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 font-bold text-xl">×</button>
-            </div>
-            <div class="p-4 flex-1 overflow-y-auto bg-slate-100">
-                <div id="tpContent" class="space-y-2"></div>
-            </div>
-            <div class="p-4 border-t flex justify-end bg-white rounded-b-lg">
-                <button onclick="document.getElementById('templatePreviewModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600 hover:bg-slate-100">關閉預覽</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 全域人員模糊搜尋器 Modal -->
-    <div id="staffPickerModal" class="hidden fixed inset-0 z-[60] flex items-start justify-center pt-20 modal-overlay bg-slate-900/50">
-        <div class="bg-white rounded-lg shadow-2xl w-[400px] flex flex-col max-h-[70vh]">
-            <div class="p-3 border-b bg-slate-50 flex justify-between items-center rounded-t-lg">
-                <h3 class="font-bold text-slate-700">🔍 搜尋並選擇人員</h3>
-                <button onclick="closeStaffPicker()" class="text-slate-400 hover:text-slate-700 font-bold text-xl">×</button>
-            </div>
-            <div class="p-3 border-b bg-blue-50">
-                <input type="text" id="staffPickerSearch" onkeyup="filterStaffPicker()" placeholder="請輸入姓名、編號或單位拼音..." class="w-full border-2 border-blue-300 p-2 rounded focus:ring-2 focus:ring-blue-500 font-bold text-blue-800 outline-none shadow-inner">
+            <div class="p-4 border-b bg-blue-50/50">
+                <input type="text" id="staffPickerSearch" onkeyup="filterStaffPicker()" placeholder="輸入姓名、編號或拼音..." class="w-full border-2 border-blue-300 p-2.5 rounded-lg focus:ring-4 focus:ring-blue-500/20 font-bold text-blue-900 outline-none shadow-inner text-lg">
             </div>
             <ul id="staffPickerList" class="flex-1 overflow-y-auto p-2 space-y-1"></ul>
         </div>
     </div>
-    
+
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/ui.js"></script>
@@ -535,7 +274,7 @@
     <script src="js/publicView.js"></script>
     <script src="js/scheduleAdmin.js"></script>
     <script src="js/maintenance.js"></script>
-    <script src="js/historyAdmin.js"></script> <!-- 確保這行有加進來 -->
+    <script src="js/historyAdmin.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
