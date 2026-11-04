@@ -7,7 +7,7 @@ function openAdminDept(deptName) {
     currentDept = deptName;
     hideAllViews();
     document.getElementById('adminView').classList.remove('hidden');
-    document.getElementById('adminTitle').innerText = `✏️ 排班管理中心：${deptName}`;
+    document.getElementById('adminTitle').innerText = `✏️ 智能排班中心：${deptName}`;
     
     try { const savedOrder = localStorage.getItem('staffOrder_' + currentDept); if (savedOrder) customStaffOrder = JSON.parse(savedOrder); } catch(e) {}
     
@@ -35,7 +35,8 @@ function switchAdminTab(tab) {
     } else {
         document.getElementById('viewTemplate').classList.remove('hidden');
         document.getElementById('tabTemplate').className = 'px-6 py-2 rounded-md font-bold transition shadow-sm bg-white text-purple-700 border border-slate-300';
-        currentViewMode = 'timeline'; // 模板設計強制使用時間軸模式
+        currentViewMode = 'timeline'; 
+        switchViewMode('timeline'); // 模板設計強制使用時間軸模式
         loadTemplateToStudio();
     }
     renderUnifiedGrid();
@@ -50,12 +51,12 @@ function switchViewMode(mode) {
     document.getElementById('viewMatrixFilters').classList.add('hidden');
     
     if (mode === 'timeline') {
-        btnTime.className = 'px-3 py-1 rounded text-sm font-bold bg-white text-blue-600 shadow-sm border border-slate-200';
-        btnMat.className = 'px-3 py-1 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 border border-transparent';
+        btnTime.className = 'px-4 py-1.5 rounded text-sm font-bold bg-white text-blue-600 shadow-sm border border-slate-200 transition';
+        btnMat.className = 'px-4 py-1.5 rounded text-sm font-bold text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent transition';
         document.getElementById('viewTimelineDate').classList.remove('hidden');
     } else {
-        btnMat.className = 'px-3 py-1 rounded text-sm font-bold bg-white text-blue-600 shadow-sm border border-slate-200';
-        btnTime.className = 'px-3 py-1 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 border border-transparent';
+        btnMat.className = 'px-4 py-1.5 rounded text-sm font-bold bg-white text-blue-600 shadow-sm border border-slate-200 transition';
+        btnTime.className = 'px-4 py-1.5 rounded text-sm font-bold text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent transition';
         document.getElementById('viewMatrixFilters').classList.remove('hidden');
         document.getElementById('viewMatrixFilters').classList.add('flex');
     }
@@ -218,7 +219,7 @@ function addEngineSpecificDate() {
 }
 function removeEngineSpecificDate(d) { engineSpecificDates = engineSpecificDates.filter(x => x !== d); renderEngineSpecificDates(); }
 function renderEngineSpecificDates() {
-    document.getElementById('engineSpecificDatesList').innerHTML = engineSpecificDates.map(d => `<span class="bg-teal-100 text-teal-800 text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 font-mono">${d} <b class="cursor-pointer text-red-500" onclick="removeEngineSpecificDate('${d}')">×</b></span>`).join('');
+    document.getElementById('engineSpecificDatesList').innerHTML = engineSpecificDates.map(d => `<span class="bg-teal-100 text-teal-800 text-[10px] px-2 py-1 rounded flex items-center gap-1 font-mono shadow-sm">${d} <b class="cursor-pointer text-red-500 hover:text-red-700 text-sm ml-1" onclick="removeEngineSpecificDate('${d}')">×</b></span>`).join('');
 }
 
 // 引擎：執行進階套用
@@ -289,11 +290,11 @@ function renderTimelineView() {
         const statusContainer = document.getElementById('dailyTemplateStatus');
         if (activeTemplate) {
             const tName = activeTemplate['備註'] || activeTemplate['remark1'] || '未知模板';
-            statusContainer.innerHTML = `<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold border border-indigo-200 shadow-sm">🏷️ 已套用：${tName}</span>
-            <button onclick="manualDecouple('${targetDate}')" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-2 py-1.5 rounded border border-red-200 font-bold shadow-sm transition">✂️ 解除綁定 (脫鉤)</button>`;
+            statusContainer.innerHTML = `<span class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-md text-xs font-bold border border-indigo-200 shadow-sm flex items-center gap-1">🏷️ 已套用模板：${tName}</span>
+            <button onclick="manualDecouple('${targetDate}')" class="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-md border border-red-200 font-bold shadow-sm transition">✂️ 解除綁定 (獨立修改)</button>`;
         } else {
             const decoupled = shifts.find(s => s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] === 'SYS_DECOUPLED');
-            statusContainer.innerHTML = decoupled ? `<span class="text-xs text-orange-500 font-bold bg-orange-50 px-2 py-1 rounded border border-orange-200">⚠️ 已獨立脫鉤修改</span>` : `<span class="text-xs text-slate-400 font-bold px-2 py-1">📝 自由排班模式</span>`;
+            statusContainer.innerHTML = decoupled ? `<span class="text-xs text-orange-600 font-bold bg-orange-50 px-3 py-1.5 rounded-md border border-orange-200 shadow-sm">⚠️ 已與模板脫鉤 (獨立修改)</span>` : `<span class="text-xs text-slate-500 font-bold bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200 shadow-sm">📝 自由排班模式</span>`;
         }
     }
 
@@ -316,14 +317,14 @@ function renderTimelineView() {
     });
 
     const sysRemarkShift = shifts.find(s => s['員工編號'] === 'SYS_REMARK') || {};
-    container.innerHTML += `<div class="bg-yellow-50 border-b border-yellow-200 p-2 flex items-center gap-4">
-        <span class="text-yellow-700 font-bold text-sm shrink-0">📢 頂部備註：</span>
-        <input type="text" class="flex-1 bg-transparent border-b border-yellow-300 focus:border-yellow-600 outline-none text-sm text-yellow-800" value="${sysRemarkShift['備註'] || ''}" placeholder="輸入頂部備註..." onblur="handleUnifiedAction('update_sys_remark', '${targetDate}', this.value, null)">
+    container.innerHTML += `<div class="bg-yellow-50/50 border-b border-yellow-200 p-3 flex items-center gap-4">
+        <span class="text-yellow-800 font-bold text-sm shrink-0 flex items-center gap-1">📢 頂部備註：</span>
+        <input type="text" class="flex-1 bg-white border border-yellow-300 focus:ring-2 focus:ring-yellow-400 rounded p-1.5 outline-none text-sm text-yellow-900 font-bold shadow-inner" value="${sysRemarkShift['備註'] || ''}" placeholder="輸入跨列顯示的頂部備註..." onblur="handleUnifiedAction('update_sys_remark', '${targetDate}', this.value, null)">
     </div>`;
 
-    let headerHtml = `<div class="flex border-b bg-slate-200 text-[11px] font-bold text-slate-600 sticky top-0 z-20"><div class="w-24 p-2 border-r text-center shrink-0 flex items-center justify-center bg-slate-200"><span class="w-4">#</span> <span class="flex-1">人員名單</span></div><div class="w-32 p-2 border-r text-center shrink-0 flex items-center justify-center text-blue-700 bg-blue-50">個人備註</div><div class="flex-1 flex min-w-[500px]">`;
-    for(let i=8; i<=21; i++) headerHtml += `<div class="flex-1 border-l border-slate-300 pl-1 py-1 text-slate-700">${i}:00</div><div class="flex-1 border-l border-dashed border-slate-300 pl-1 py-1 text-[9px] text-slate-400">30</div>`;
-    headerHtml += `<div class="w-8 border-l border-slate-300 pl-1 py-1 text-slate-700">22</div></div><div class="w-40 p-2 border-l text-center shrink-0 flex items-center justify-center text-teal-700 bg-teal-50">工作補充</div></div>`;
+    let headerHtml = `<div class="flex border-b bg-slate-200 text-[11px] font-bold text-slate-700 sticky top-0 z-20 shadow-sm"><div class="w-24 p-2 border-r text-center shrink-0 flex items-center justify-center bg-slate-200/90 backdrop-blur"><span class="w-4 text-slate-400">#</span> <span class="flex-1">人員名單</span></div><div class="w-32 p-2 border-r text-center shrink-0 flex items-center justify-center text-blue-800 bg-blue-100/80 backdrop-blur">個人備註</div><div class="flex-1 flex min-w-[500px]">`;
+    for(let i=8; i<=21; i++) headerHtml += `<div class="flex-1 border-l border-slate-300 pl-1 py-1">${i}:00</div><div class="flex-1 border-l border-dashed border-slate-300 pl-1 py-1 text-[9px] text-slate-400">30</div>`;
+    headerHtml += `<div class="w-8 border-l border-slate-300 pl-1 py-1">22</div></div><div class="w-40 p-2 border-l text-center shrink-0 flex items-center justify-center text-teal-800 bg-teal-100/80 backdrop-blur">工作補充</div></div>`;
     container.innerHTML += headerHtml;
 
     let realRowIndex = 0;
@@ -334,21 +335,23 @@ function renderTimelineView() {
         let mainShift = myShifts.length > 0 ? myShifts[0] : remarkCarrier;
         let r1 = mainShift ? (mainShift['備註'] || '') : ''; let r2 = mainShift ? (mainShift['備註2'] || '') : '';
         
-        let rowClass = isDummy ? 'bg-amber-50/40 border-b-2 border-dashed border-amber-300' : (realRowIndex % 2 === 0 ? 'bg-white hover:bg-slate-50 border-b border-slate-200' : 'bg-blue-50/20 hover:bg-blue-50/60 border-b border-slate-200');
+        let rowClass = isDummy ? 'bg-amber-50/60 border-b-2 border-dashed border-amber-300' : (realRowIndex % 2 === 0 ? 'bg-white hover:bg-slate-50 border-b border-slate-200' : 'bg-blue-50/30 hover:bg-blue-50/80 border-b border-slate-200');
         if (!isDummy) realRowIndex++;
         
         let nameActionHtml = isDummy ? 
-            `<div class="text-amber-800 text-sm font-extrabold cursor-pointer hover:bg-amber-200 px-2 py-0.5 rounded shadow-sm border border-amber-300 bg-amber-50" onclick="openStaffPicker('', currentDept, (newEmp) => handleUnifiedAction('move_shift_emp', '${targetDate}', '${emp.shiftData['排班ID']}', newEmp))">${emp['姓名']} <span class="text-[10px]">👆</span></div>` : 
-            `<span class="text-blue-700 font-bold w-full text-center">${emp['姓名']}</span>`;
+            `<div class="text-amber-800 text-sm font-extrabold cursor-pointer hover:bg-amber-200 px-2 py-1 rounded shadow-sm border border-amber-300 bg-amber-100 transition" onclick="openStaffPicker('', currentDept, (newEmp) => handleUnifiedAction('move_shift_emp', '${targetDate}', '${emp.shiftData['排班ID']}', newEmp))">${emp['姓名']} <span class="text-[10px]">👆</span></div>` : 
+            `<span class="text-blue-800 font-bold w-full text-center tracking-wide">${emp['姓名']}</span>`;
 
-        let rowHtml = `<div class="flex timeline-container group transition ${rowClass} h-[50px]">
-            <div class="w-24 p-1 border-r ${isDummy ? 'bg-amber-100/60 border-r-amber-300' : 'border-r-slate-200'} flex flex-col items-center justify-center shadow-sm z-10 relative shrink-0">
-                <div class="absolute top-0 left-0 bg-slate-300 text-slate-700 text-[9px] px-1.5 py-0.5 rounded-br-lg shadow-sm font-bold z-20">${index + 1}</div>
+        let dragProps = `draggable="true" ondragstart="dragRow(event, '${emp.rowId}')" ondragover="allowDrop(event)" ondrop="dropRow(event, '${emp.rowId}')"`;
+
+        let rowHtml = `<div class="flex timeline-container group transition ${rowClass} h-[55px]">
+            <div class="w-24 p-1 border-r ${isDummy ? 'bg-amber-100/50 border-r-amber-300' : 'border-r-slate-200'} flex flex-col items-center justify-center shadow-sm z-10 relative cursor-ns-resize shrink-0" ${dragProps}>
+                <div class="absolute top-0 left-0 bg-slate-300/80 text-slate-700 text-[9px] px-1.5 py-0.5 rounded-br-lg shadow-sm font-bold z-20">${index + 1}</div>
                 <div class="font-bold truncate w-full text-center flex flex-col items-center gap-0 mt-3">${nameActionHtml}</div>
             </div>
             
-            <div class="w-32 border-r ${isDummy ? 'bg-amber-50/50 border-r-amber-300' : 'bg-transparent border-r-slate-200'} flex items-center p-1 shrink-0">
-                <input type="text" class="w-full h-full text-xs p-1 border-transparent focus:border-blue-400 focus:ring-1 rounded bg-transparent text-blue-800 font-bold"
+            <div class="w-32 border-r ${isDummy ? 'bg-amber-50/50 border-r-amber-300' : 'bg-transparent border-r-slate-200'} flex items-center p-1.5 shrink-0">
+                <input type="text" class="w-full h-full text-xs p-1.5 border-transparent focus:ring-2 focus:ring-blue-400 rounded-md bg-white/50 focus:bg-white text-blue-900 font-bold shadow-inner transition outline-none"
                        placeholder="備註..." value="${r1}" onblur="handleUnifiedAction('update_remarks', '${targetDate}', '${emp['員工編號']}', this.value, null)">
             </div>
             
@@ -361,24 +364,24 @@ function renderTimelineView() {
             const [sh, sm] = (shift['開始時間'] || '08:00').split(':').map(Number);
             const [eh, em] = (shift['結束時間'] || '09:00').split(':').map(Number);
             const left = ((sh - 8) + sm/60) / 14 * 100; const width = ((eh - sh) + (em - sm)/60) / 14 * 100;
-            let shiftBg = isDummy ? 'bg-amber-100 border-2 border-dashed border-amber-500 hover:bg-amber-200' : 'bg-blue-100 border border-blue-400 hover:bg-blue-200';
+            let shiftBg = isDummy ? 'bg-amber-100 border-2 border-dashed border-amber-500 hover:bg-amber-200 shadow-md' : 'bg-blue-100 border border-blue-400 hover:bg-blue-200 shadow-sm';
             
-            rowHtml += `<div class="absolute top-[4px] bottom-[4px] ${shiftBg} shadow-sm rounded flex flex-col justify-center items-center cursor-grab active:cursor-grabbing transition overflow-hidden z-10"
+            rowHtml += `<div class="absolute top-[5px] bottom-[5px] ${shiftBg} rounded-md flex flex-col justify-center items-center cursor-grab active:cursor-grabbing transition overflow-hidden z-10"
                              draggable="true" ondragstart="dragShift(event, '${shift['排班ID']}')" onclick="handleUnifiedAction('add_shift', '${targetDate}', '${shift['排班ID']}')" style="left:${left}%; width:${width}%;">
                 <div class="font-bold text-${isDummy?'amber':'blue'}-900 text-xs truncate w-full text-center px-1">${shift['工作名稱']}</div>
-                <div class="text-[9px] text-${isDummy?'amber':'slate'}-600 font-semibold mt-[2px]">${shift['開始時間']} - ${shift['結束時間']}</div>
+                <div class="text-[10px] text-${isDummy?'amber':'slate'}-600 font-bold mt-[1px] opacity-80">${shift['開始時間']} - ${shift['結束時間']}</div>
             </div>`;
         });
-        rowHtml += `</div><div class="w-40 border-l ${isDummy ? 'bg-amber-50/50 border-l-amber-300' : 'bg-transparent border-l-slate-200'} flex items-center p-1 shrink-0">
-            <input type="text" class="w-full h-full text-xs p-1 border-transparent focus:border-teal-400 focus:ring-1 rounded bg-transparent text-teal-800"
-                   placeholder="補充..." value="${r2}" onblur="handleUnifiedAction('update_remarks', '${targetDate}', '${emp['員工編號']}', null, this.value)">
+        rowHtml += `</div><div class="w-40 border-l ${isDummy ? 'bg-amber-50/50 border-l-amber-300' : 'bg-transparent border-l-slate-200'} flex items-center p-1.5 shrink-0">
+            <input type="text" class="w-full h-full text-xs p-1.5 border-transparent focus:ring-2 focus:ring-teal-400 rounded-md bg-white/50 focus:bg-white text-teal-900 font-bold shadow-inner transition outline-none"
+                   placeholder="補充說明..." value="${r2}" onblur="handleUnifiedAction('update_remarks', '${targetDate}', '${emp['員工編號']}', null, this.value)">
         </div></div>`; 
         container.innerHTML += rowHtml;
     });
 
-    container.innerHTML += `<div class="bg-yellow-50 border-t border-yellow-200 p-2 flex items-center gap-2 mt-2">
-        <span class="text-yellow-700 font-bold text-sm shrink-0">📢 底部備註：</span>
-        <input type="text" class="flex-1 bg-transparent border-b border-yellow-300 focus:border-yellow-600 outline-none text-sm text-yellow-800" value="${sysRemarkShift['備註2'] || ''}" placeholder="輸入底部備註..." onblur="handleUnifiedAction('update_sys_remark', '${targetDate}', null, this.value)">
+    container.innerHTML += `<div class="bg-yellow-50/50 border-t border-yellow-200 p-3 flex items-center gap-4 mt-2">
+        <span class="text-yellow-800 font-bold text-sm shrink-0 flex items-center gap-1">📢 底部備註：</span>
+        <input type="text" class="flex-1 bg-white border border-yellow-300 focus:ring-2 focus:ring-yellow-400 rounded p-1.5 outline-none text-sm text-yellow-900 font-bold shadow-inner" value="${sysRemarkShift['備註2'] || ''}" placeholder="輸入跨列顯示的底部備註..." onblur="handleUnifiedAction('update_sys_remark', '${targetDate}', null, this.value)">
     </div>`;
 }
 
@@ -395,7 +398,7 @@ function renderMatrixView() {
         let dt = new Date(y, parseInt(m)-1, d);
         if (allowedDows.includes(dt.getDay())) targetDates.push({ date: `${y}-${m}-${String(d).padStart(2,'0')}`, dayName: ['日','一','二','三','四','五','六'][dt.getDay()] });
     }
-    if(targetDates.length === 0) { container.innerHTML = '<div class="p-4 text-slate-500 font-bold">此篩選條件下無符合的日期。</div>'; return; }
+    if(targetDates.length === 0) { container.innerHTML = '<div class="p-8 text-center text-slate-400 font-bold text-lg">此篩選條件下無符合的日期。</div>'; return; }
 
     const monthShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr));
     let usedTasks = new Set();
@@ -403,36 +406,43 @@ function renderMatrixView() {
     appData.tasks.filter(t => t['部門名稱'] === currentDept).forEach(t => usedTasks.add(t['工作名稱']));
     const taskArray = Array.from(usedTasks).sort();
 
-    let tableHtml = `<table class="w-full text-left border-collapse text-sm"><thead class="bg-slate-200 sticky top-0 z-20 shadow-sm text-slate-700"><tr>
-        <th class="border p-2 w-10 text-center">#</th>
-        <th class="border p-2 w-20 text-center">部門</th>
-        <th class="border p-2 w-32">工作名稱</th>`;
+    let tableHtml = `<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-sm"><thead class="bg-slate-200 sticky top-0 z-20 shadow-sm text-slate-700"><tr>
+        <th class="border border-slate-300 p-2 w-10 text-center">#</th>
+        <th class="border border-slate-300 p-2 w-20 text-center">部門</th>
+        <th class="border border-slate-300 p-2 w-32">工作任務</th>`;
     
-    targetDates.forEach(td => { tableHtml += `<th class="border p-2 text-center w-24 leading-tight">${td.date.substring(5)}<br><span class="text-[10px] text-slate-500">(${td.dayName})</span></th>`; });
+    targetDates.forEach(td => { 
+        const isWeekend = (td.dayName === '六' || td.dayName === '日');
+        const thClass = isWeekend ? 'text-pink-600 bg-pink-50' : '';
+        tableHtml += `<th class="border border-slate-300 p-2 text-center min-w-[100px] leading-tight ${thClass}">${td.date.substring(5)}<br><span class="text-[10px] opacity-70">(${td.dayName})</span></th>`; 
+    });
     tableHtml += `</tr></thead><tbody class="bg-white">`;
 
     taskArray.forEach((taskName, idx) => {
         const rowClass = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
         tableHtml += `<tr class="${rowClass} hover:bg-blue-50/30 transition">
-            <td class="border p-2 text-center text-slate-400 font-bold">${idx + 1}</td>
-            <td class="border p-2 text-center text-xs font-bold text-slate-600">${currentDept}</td>
-            <td class="border p-2 font-bold text-blue-800">${taskName}</td>`;
+            <td class="border border-slate-200 p-2 text-center text-slate-400 font-bold">${idx + 1}</td>
+            <td class="border border-slate-200 p-2 text-center text-xs font-bold text-slate-500">${currentDept}</td>
+            <td class="border border-slate-200 p-2 font-bold text-blue-800">${taskName}</td>`;
         
         targetDates.forEach(td => {
             const dailyShifts = monthShifts.filter(s => s['日期'] === td.date && s['工作名稱'] === taskName);
-            tableHtml += `<td class="border p-1 text-center align-top gap-1 flex flex-col">`;
+            const isWeekend = (td.dayName === '六' || td.dayName === '日');
+            const tdClass = isWeekend ? 'bg-pink-50/30' : '';
+            
+            tableHtml += `<td class="border border-slate-200 p-1.5 text-center align-top flex flex-col gap-1.5 ${tdClass}">`;
             
             dailyShifts.forEach(shift => {
                 let empName = shift['員工編號'] ? (appData.staff.find(e => e['員工編號'] === shift['員工編號'])?.['姓名'] || shift['員工編號']) : '⚠️ 未指派';
-                let btnClass = shift['員工編號'] ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200' : 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse hover:bg-amber-200';
-                tableHtml += `<button onclick="openStaffPicker('${shift['員工編號']}', currentDept, (newEmp) => handleUnifiedAction('assign_matrix_emp', '${td.date}', '${shift['排班ID']}', newEmp))" class="w-full text-[10px] p-1 rounded border shadow-sm font-bold truncate transition ${btnClass}">${empName}</button>`;
+                let btnClass = shift['員工編號'] ? 'bg-white text-blue-700 border-blue-300 hover:bg-blue-50 shadow-sm' : 'bg-amber-50 text-amber-700 border-amber-400 border-dashed animate-pulse hover:bg-amber-100 shadow-sm';
+                tableHtml += `<button onclick="openStaffPicker('${shift['員工編號']}', currentDept, (newEmp) => handleUnifiedAction('assign_matrix_emp', '${td.date}', '${shift['排班ID']}', newEmp))" class="w-full text-[11px] p-1.5 rounded border font-bold truncate transition ${btnClass}">${empName}</button>`;
             });
-            tableHtml += `<button onclick="handleUnifiedAction('add_shift', '${td.date}')" class="text-[9px] text-slate-400 hover:text-indigo-600 border border-dashed border-slate-300 rounded p-0.5 mt-1 transition">➕</button>`;
+            tableHtml += `<button onclick="handleUnifiedAction('add_shift', '${td.date}')" class="text-[10px] text-slate-400 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 bg-slate-50 hover:bg-indigo-50 rounded p-1 transition w-full text-center">➕ 派工</button>`;
             tableHtml += `</td>`;
         });
         tableHtml += `</tr>`;
     });
-    tableHtml += `</tbody></table>`; container.innerHTML = tableHtml;
+    tableHtml += `</tbody></table></div>`; container.innerHTML = tableHtml;
 }
 
 // === 彈出 Modal 與拖拉控制邏輯 ===
@@ -451,20 +461,40 @@ function openShiftModal(shiftId = null, targetDate = null) {
     
     if(shiftId) {
         const shift = getActiveShifts(modalTargetDate).find(s => s['排班ID'] === shiftId);
-        document.getElementById('modalTitle').innerText = '編輯工作'; document.getElementById('modalShiftId').value = shiftId; document.getElementById('modalTask').value = shift['工作名稱']; document.getElementById('modalStart').value = shift['開始時間']; document.getElementById('modalEnd').value = shift['結束時間']; document.getElementById('modalCat').value = shift['工作類別']; document.getElementById('modalRemark1').value = shift['備註'] || ''; document.getElementById('modalRemark2').value = shift['備註2'] || ''; document.getElementById('btnDeleteShift').classList.remove('hidden');
+        document.getElementById('modalTitle').innerHTML = '✏️ 編輯工作'; document.getElementById('modalShiftId').value = shiftId; document.getElementById('modalTask').value = shift['工作名稱']; document.getElementById('modalStart').value = shift['開始時間']; document.getElementById('modalEnd').value = shift['結束時間']; document.getElementById('modalCat').value = shift['工作類別']; document.getElementById('modalRemark1').value = shift['備註'] || ''; document.getElementById('modalRemark2').value = shift['備註2'] || ''; document.getElementById('btnDeleteShift').classList.remove('hidden');
     } else {
-        document.getElementById('modalTitle').innerText = '新增工作 (可先不選人)'; document.getElementById('modalShiftId').value = 'S' + new Date().getTime(); document.getElementById('modalStart').value = '08:00'; document.getElementById('modalEnd').value = '12:00'; document.getElementById('modalRemark1').value = ''; document.getElementById('modalRemark2').value = ''; document.getElementById('btnDeleteShift').classList.add('hidden');
+        document.getElementById('modalTitle').innerHTML = '➕ 新增工作 (可先不選人)'; document.getElementById('modalShiftId').value = 'S' + new Date().getTime(); document.getElementById('modalStart').value = '08:00'; document.getElementById('modalEnd').value = '17:00'; document.getElementById('modalRemark1').value = ''; document.getElementById('modalRemark2').value = ''; document.getElementById('btnDeleteShift').classList.add('hidden');
     }
     modal.classList.remove('hidden');
 }
 
 function closeShiftModal() { document.getElementById('shiftModal').classList.add('hidden'); }
 function saveShift() { 
-    handleUnifiedAction('update_remarks', modalTargetDate, document.getElementById('modalEmp').value, document.getElementById('modalRemark1').value, document.getElementById('modalRemark2').value); // 確保觸發載體儲存
+    handleUnifiedAction('update_remarks', modalTargetDate, document.getElementById('modalEmp').value, document.getElementById('modalRemark1').value, document.getElementById('modalRemark2').value); 
     const shiftData = { shiftId: document.getElementById('modalShiftId').value, date: modalTargetDate, dept: currentDept, empId: document.getElementById('modalEmp').value, task: document.getElementById('modalTask').value, start: document.getElementById('modalStart').value, end: document.getElementById('modalEnd').value, category: document.getElementById('modalCat').value, remark1: document.getElementById('modalRemark1').value, remark2: document.getElementById('modalRemark2').value };
     updateActiveShift(shiftData); closeShiftModal(); renderUnifiedGrid();
 }
 function deleteShift() { handleUnifiedAction('delete_shift', modalTargetDate, document.getElementById('modalShiftId').value); }
 
 function allowDrop(ev) { ev.preventDefault(); }
+function dragRow(ev, rowId) { ev.dataTransfer.setData("rowEmpId", rowId); }
 function dragShift(ev, shiftId) { ev.dataTransfer.setData("shiftId", shiftId); ev.stopPropagation(); }
+function dropRow(ev, targetRowId) { 
+    ev.preventDefault(); ev.stopPropagation(); const sourceRowId = ev.dataTransfer.getData("rowEmpId"); 
+    if (sourceRowId && sourceRowId !== targetRowId) { 
+        let shifts = getActiveShifts(getActiveContextDate());
+        let tempRows = [];
+        const { deptStaffMap } = typeof getMixedDeptStaff === 'function' ? getMixedDeptStaff(document.getElementById('viewTimelineDate').value.substring(0, 7)) : { deptStaffMap: new Map() };
+        Array.from(deptStaffMap.values()).forEach(emp => { if(!emp['員工編號'].startsWith('SYS_')) tempRows.push({ rowId: emp['員工編號'], isDummy: false }); });
+        shifts.filter(s => s['員工編號'] === '').forEach(shift => tempRows.push({ rowId: shift['排班ID'], isDummy: true }));
+        
+        tempRows.sort((a, b) => { let idxA = customStaffOrder.indexOf(a.rowId); let idxB = customStaffOrder.indexOf(b.rowId); return (idxA === -1 ? (a.isDummy?-1:999) : idxA) - (idxB === -1 ? (b.isDummy?-1:999) : idxB); });
+        let currentOrder = tempRows.map(r => r.rowId);
+        const sourceIdx = currentOrder.indexOf(sourceRowId); const targetIdx = currentOrder.indexOf(targetRowId); 
+        if (sourceIdx !== -1 && targetIdx !== -1) { 
+            currentOrder.splice(sourceIdx, 1); currentOrder.splice(targetIdx, 0, sourceRowId); customStaffOrder = currentOrder; 
+            fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'update_staff_order', deptName: currentDept, order: customStaffOrder }) }).catch(e => {});
+            renderUnifiedGrid(); 
+        } 
+    } 
+}
