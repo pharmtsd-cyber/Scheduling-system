@@ -357,7 +357,13 @@
             <input type="hidden" id="modalShiftId">
             <div class="space-y-3">
                 <div class="flex gap-2">
-                    <div class="w-1/2"><label class="text-sm font-bold">人員</label><select id="modalEmp" class="w-full border p-2 rounded"></select></div>
+                    <div class="w-1/2">
+                        <label class="text-sm font-bold">人員</label>
+                        <input type="hidden" id="modalEmp">
+                        <button type="button" onclick="openStaffPicker(document.getElementById('modalEmp').value, currentDept, (newEmp) => updateModalEmp(newEmp))" class="w-full border p-2 rounded bg-white text-left font-bold text-slate-700 flex justify-between items-center shadow-sm">
+                            <span id="txtModalEmp"></span> <span class="text-slate-400">🔍</span>
+                        </button>
+                    </div>
                     <div class="w-1/2"><label class="text-sm font-bold">工作</label><select id="modalTask" class="w-full border p-2 rounded"></select></div>
                 </div>
                 <div class="flex gap-2">
@@ -469,7 +475,10 @@
                 <!-- 選項 2：移交工作 -->
                 <div class="p-3 rounded border border-indigo-200 bg-indigo-50 shadow-sm">
                     <div class="text-sm font-bold text-indigo-800 mb-2">🔄 2. 將工作移交給其他人：</div>
-                    <select id="raReplaceEmp" class="w-full border p-2 rounded text-sm mb-2 font-bold text-slate-700"></select>
+                    <input type="hidden" id="raReplaceEmp">
+                    <button type="button" onclick="openStaffPicker('', currentDept, (newEmp) => { document.getElementById('raReplaceEmp').value = newEmp; document.getElementById('txtRaReplaceEmp').innerText = getEmpNameWithDefault(newEmp, '已選擇'); })" class="w-full border p-2 rounded bg-white text-left font-bold text-indigo-700 mb-2 flex justify-between items-center shadow-sm">
+                        <span id="txtRaReplaceEmp">-- 點擊搜尋接收人員 --</span> <span class="text-slate-400">🔍</span>
+                    </button>
                     <div class="flex gap-2">
                         <button onclick="replaceEmp('day')" class="flex-1 bg-indigo-500 text-white px-2 py-1.5 rounded text-xs font-bold shadow hover:bg-indigo-600">僅移交當日</button>
                         <button onclick="replaceEmp('month')" class="flex-1 bg-indigo-700 text-white px-2 py-1.5 rounded text-xs font-bold shadow hover:bg-indigo-800">移交整個月份</button>
@@ -574,6 +583,20 @@
             <div class="p-4 border-t flex justify-end bg-white rounded-b-lg">
                 <button onclick="document.getElementById('templatePreviewModal').classList.add('hidden')" class="px-4 py-2 border rounded font-bold text-slate-600 hover:bg-slate-100">關閉預覽</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 全域人員模糊搜尋器 Modal -->
+    <div id="staffPickerModal" class="hidden fixed inset-0 z-[60] flex items-start justify-center pt-20 modal-overlay bg-slate-900/50">
+        <div class="bg-white rounded-lg shadow-2xl w-[400px] flex flex-col max-h-[70vh]">
+            <div class="p-3 border-b bg-slate-50 flex justify-between items-center rounded-t-lg">
+                <h3 class="font-bold text-slate-700">🔍 搜尋並選擇人員</h3>
+                <button onclick="closeStaffPicker()" class="text-slate-400 hover:text-slate-700 font-bold text-xl">×</button>
+            </div>
+            <div class="p-3 border-b bg-blue-50">
+                <input type="text" id="staffPickerSearch" onkeyup="filterStaffPicker()" placeholder="請輸入姓名、編號或單位拼音..." class="w-full border-2 border-blue-300 p-2 rounded focus:ring-2 focus:ring-blue-500 font-bold text-blue-800 outline-none shadow-inner">
+            </div>
+            <ul id="staffPickerList" class="flex-1 overflow-y-auto p-2 space-y-1"></ul>
         </div>
     </div>
     
