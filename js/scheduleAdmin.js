@@ -389,13 +389,37 @@ function dropRow(ev, targetRowId) {
     ev.preventDefault(); ev.stopPropagation(); 
     const sourceRowId = ev.dataTransfer.getData("rowEmpId"); 
     if (sourceRowId && sourceRowId !== targetRowId) { 
-        if (!customStaffOrder.includes(sourceRowId)) customStaffOrder.push(sourceRowId); 
-        if (!customStaffOrder.includes(targetRowId)) customStaffOrder.push(targetRowId); 
-        const sourceIdx = customStaffOrder.indexOf(sourceRowId); 
-        const targetIdx = customStaffOrder.indexOf(targetRowId); 
+        // 1. 取得當前畫面上所有列的完整順序 (避免稀疏陣列導致排序錯亂)
+        const date = document.getElementById('interactiveDate').value;
+        const currentMonthStr = date.substring(0, 7);
+        const shifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === date);
+        const { deptStaff } = getMixedDeptStaff(currentMonthStr);
+        
+        let tempRows = [];
+        // 將實體人員與待指派工作加入暫存清單
+        deptStaff.forEach(emp => tempRows.push({ rowId: emp['員工編號'], isDummy: false }));
+        shifts.filter(s => s['員工編號'] === '').forEach(shift => tempRows.push({ rowId: shift['排班ID'], isDummy: true }));
+        
+        // 模擬當前畫面的真實排序狀態
+        tempRows.sort((a, b) => {
+            let idxA = customStaffOrder.indexOf(a.rowId);
+            let idxB = customStaffOrder.indexOf(b.rowId);
+            let defA = a.isDummy ? -1 : 999;
+            let defB = b.isDummy ? -1 : 999;
+            return (idxA === -1 ? defA : idxA) - (idxB === -1 ? defB : idxB);
+        });
+        
+        // 攤平成純 ID 陣列
+        let currentOrder = tempRows.map(r => r.rowId);
+        
+        // 2. 在完整的陣列中執行拖曳移位
+        const sourceIdx = currentOrder.indexOf(sourceRowId); 
+        const targetIdx = currentOrder.indexOf(targetRowId); 
         if (sourceIdx !== -1 && targetIdx !== -1) { 
-            customStaffOrder.splice(sourceIdx, 1); 
-            customStaffOrder.splice(targetIdx, 0, sourceRowId); 
+            currentOrder.splice(sourceIdx, 1); 
+            currentOrder.splice(targetIdx, 0, sourceRowId); 
+            
+            customStaffOrder = currentOrder; // 將完整的新順序寫回全域
             renderInteractiveGrid(); 
         } 
     } 
