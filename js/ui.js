@@ -1,12 +1,11 @@
-function showToast(msg = "已儲存") {
+function showToast(msg = "已處理") {
     const toast = document.getElementById('statusToast');
-    toast.innerText = msg;
+    toast.innerHTML = `<span>✅</span> <span>${msg}</span>`;
     toast.classList.remove('hidden');
     setTimeout(() => toast.classList.add('hidden'), 2500);
 }
 
 function hideAllViews() {
-    // ★ 移除了 holidayAdminView，並加入 el 安全判斷避免找不到元素時當機
     ['welcomeMsg', 'publicView', 'adminView', 'employeeAdminView', 'taskAdminView'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
@@ -16,7 +15,9 @@ function hideAllViews() {
 function renderPublicSidebar() {
     const list = document.getElementById('publicDeptList');
     list.innerHTML = '';
-    appData.depts.forEach(d => list.innerHTML += `<li class="cursor-pointer p-2 hover:bg-slate-700 rounded transition font-bold" onclick="openPublicDept('${d['部門名稱']}')">🏥 ${d['部門名稱']}</li>`);
+    if(appData.depts) {
+        appData.depts.forEach(d => list.innerHTML += `<li class="cursor-pointer p-2 hover:bg-slate-700 rounded transition font-bold" onclick="openPublicDept('${d['部門名稱']}')">🏥 ${d['部門名稱']}</li>`);
+    }
 }
 
 // ==========================================
@@ -34,10 +35,7 @@ function openStaffPicker(currentEmpId, contextDept, callback) {
     setTimeout(() => document.getElementById('staffPickerSearch').focus(), 100);
 }
 
-function closeStaffPicker() {
-    document.getElementById('staffPickerModal').classList.add('hidden');
-}
-
+function closeStaffPicker() { document.getElementById('staffPickerModal').classList.add('hidden'); }
 function filterStaffPicker() { renderStaffPickerList(); }
 
 function renderStaffPickerList() {
@@ -46,12 +44,12 @@ function renderStaffPickerList() {
     let html = '';
     
     if (!query || "未指派".includes(query)) {
-        html += `<li onclick="selectStaffPicker('')" class="cursor-pointer p-2 rounded bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold border border-orange-200 mb-2 shadow-sm flex items-center gap-2">
-            ⚠️ 設為待指派 (留空)
+        html += `<li onclick="selectStaffPicker('')" class="cursor-pointer p-3 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold border border-orange-200 mb-3 shadow-sm flex items-center gap-2 transition">
+            ⚠️ 設為待指派 (保留空位)
         </li>`;
     }
 
-    let staffArr = [...appData.staff].filter(s => s['員工編號'] && !s['員工編號'].startsWith('SYS_') && s['所屬單位'] !== '離職');
+    let staffArr = [...(appData.staff || [])].filter(s => s['員工編號'] && !s['員工編號'].startsWith('SYS_') && s['所屬單位'] !== '離職');
     
     if (query) {
         staffArr = staffArr.filter(s => (s['姓名']||'').toLowerCase().includes(query) || (s['員工編號']||'').toLowerCase().includes(query) || (s['所屬組別']||'').toLowerCase().includes(query));
@@ -70,9 +68,9 @@ function renderStaffPickerList() {
     } else {
         staffArr.forEach(s => {
             const isDept = s['所屬組別'] === staffPickerContextDept;
-            const tag = isDept ? `<span class="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded shadow-sm">本單位</span>` : `<span class="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">${s['所屬組別']||'外援'}</span>`;
-            html += `<li onclick="selectStaffPicker('${s['員工編號']}')" class="cursor-pointer p-2 rounded hover:bg-blue-50 border border-transparent hover:border-blue-200 flex justify-between items-center transition mb-1">
-                <span class="font-bold text-slate-700">${s['姓名']}</span> ${tag}
+            const tag = isDept ? `<span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded shadow-sm">本單位</span>` : `<span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200">${s['所屬組別']||'外援'}</span>`;
+            html += `<li onclick="selectStaffPicker('${s['員工編號']}')" class="cursor-pointer p-3 rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-200 flex justify-between items-center transition mb-1 text-sm">
+                <span class="font-bold text-slate-700">${s['姓名']} <span class="text-slate-400 text-xs font-normal ml-1">(${s['員工編號']})</span></span> ${tag}
             </li>`;
         });
     }
