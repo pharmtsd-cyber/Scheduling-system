@@ -19,14 +19,12 @@ function openAdminDept(deptName) {
     renderInteractiveGrid();
 }
 
-// ★ 取得該部門該月份應顯示的「混合員工名單」
 function getMixedDeptStaff(monthStr) {
     const monthShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr));
     const monthEmpIds = new Set(monthShifts.map(s => s['員工編號']));
     
     let deptStaffMap = new Map();
     appData.staff.forEach(s => {
-        // 條件：在這個月已有班 (包含離職者)，或是屬於這部門且尚未離職
         if (monthEmpIds.has(s['員工編號']) || (s['所屬組別'] === currentDept && s['所屬單位'] !== '離職')) {
             deptStaffMap.set(s['員工編號'], s);
         }
@@ -108,7 +106,6 @@ function renderInteractiveGrid() {
                 <div class="font-bold text-blue-700 cursor-pointer hover:bg-blue-50 py-1 rounded text-sm truncate w-full text-center flex flex-col items-center gap-0.5" onclick="openRowActionModal('${emp['員工編號']}')" title="點擊展開人員操作選單">
                     <span>${emp['姓名']} <span class="text-slate-400 text-xs">⚙️</span></span> ${empStatusTag}
                 </div>
-
                 ${clipboardShift ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[9px] bg-indigo-100 text-indigo-700 px-2 mt-1 rounded shadow hover:bg-indigo-200">📋貼上</button>` : ''}
             </div>
             
@@ -173,7 +170,6 @@ function updateShiftRemarks(shiftId, r1, r2) {
 }
 
 function copyShift(shiftId) { clipboardShift = appData.shifts.find(s => s['排班ID'] === shiftId); showToast("✅ 已複製"); renderInteractiveGrid(); }
-
 function pasteShift(empId) {
     if (!clipboardShift) return; openShiftModal(); 
     document.getElementById('modalEmp').value = empId; document.getElementById('modalTask').value = clipboardShift['工作名稱']; document.getElementById('modalStart').value = clipboardShift['開始時間']; document.getElementById('modalEnd').value = clipboardShift['結束時間']; document.getElementById('modalCat').value = clipboardShift['工作類別']; document.getElementById('modalRemark1').value = clipboardShift['備註'] || ''; document.getElementById('modalRemark2').value = clipboardShift['備註2'] || ''; document.getElementById('modalTitle').innerText = '📋 貼上工作';
@@ -230,14 +226,12 @@ function saveShift() {
     }); 
     closeShiftModal(); renderInteractiveGrid();
 }
-
 async function deleteShift() { if(confirm("確定刪除此工作？(立即生效)")) { await postAction({ action: 'delete_shift', shiftId: document.getElementById('modalShiftId').value }); closeShiftModal(); } }
 
 async function copyMonthSchedule() {
     const sourceMonth = document.getElementById('previewMonth').value; const targetMonth = document.getElementById('targetMonth').value;
     if(!sourceMonth || !targetMonth) return alert("請確認已選擇「預覽來源月份」與「目標承襲月份」！");
     if(sourceMonth === targetMonth) return alert("來源與目標月份不可相同！");
-    
     if(confirm(`⚠️ 請確認承襲操作：\n\n系統即將把 [${sourceMonth}] 的【全部班表】(含平日班、假日班)\n複製到 [${targetMonth}]。\n\n※ 系統會自動智慧對齊星期幾，確定要執行嗎？`)) { 
         await postAction({ action: 'copy_month_template', sourceMonth, targetMonth, deptName: currentDept }); 
         document.getElementById('previewMonth').value = targetMonth; document.getElementById('interactiveDate').value = `${targetMonth}-01`;
@@ -250,37 +244,24 @@ async function copyMonthSchedule() {
 // ⚙️ 整合操作面板 (移交、刪除、編輯)
 // ==========================================
 function openRowActionModal(empId) {
-    const emp = appData.staff.find(e => e['員工編號'] === empId);
-    if(!emp) return;
-    document.getElementById('raEmpId').value = empId;
-    document.getElementById('raEmpName').innerText = emp['姓名'];
-    
+    const emp = appData.staff.find(e => e['員工編號'] === empId); if(!emp) return;
+    document.getElementById('raEmpId').value = empId; document.getElementById('raEmpName').innerText = emp['姓名'];
     const currentMonthStr = document.getElementById('interactiveDate').value.substring(0, 7);
     const { deptStaffMap } = getMixedDeptStaff(currentMonthStr);
     document.getElementById('raReplaceEmp').innerHTML = '<option value="">--請選擇接收人員--</option>' + buildEmpSelectOptions(deptStaffMap, '');
-    
     document.getElementById('rowActionModal').classList.remove('hidden');
 }
 
-function openQuickEmpFromAction() {
-    document.getElementById('rowActionModal').classList.add('hidden');
-    openQuickEmpEdit(document.getElementById('raEmpId').value);
-}
+function openQuickEmpFromAction() { document.getElementById('rowActionModal').classList.add('hidden'); openQuickEmpEdit(document.getElementById('raEmpId').value); }
 
 function replaceEmp(scope) {
-    const oldEmpId = document.getElementById('raEmpId').value;
-    const newEmpId = document.getElementById('raReplaceEmp').value;
-    const dateStr = document.getElementById('interactiveDate').value;
-    const monthStr = dateStr.substring(0, 7);
-    
+    const oldEmpId = document.getElementById('raEmpId').value; const newEmpId = document.getElementById('raReplaceEmp').value;
+    const dateStr = document.getElementById('interactiveDate').value; const monthStr = dateStr.substring(0, 7);
     if (!newEmpId || oldEmpId === newEmpId) return alert('請選擇不同的接收人員！');
     
     let shiftsToReplace = [];
-    if (scope === 'day') {
-        shiftsToReplace = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === oldEmpId);
-    } else {
-        shiftsToReplace = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr) && s['員工編號'] === oldEmpId);
-    }
+    if (scope === 'day') shiftsToReplace = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === oldEmpId);
+    else shiftsToReplace = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr) && s['員工編號'] === oldEmpId);
     
     if (shiftsToReplace.length === 0) return alert(`此人員在該${scope==='day'?'日':'月'}無任何工作可移交。`);
     
@@ -288,56 +269,29 @@ function replaceEmp(scope) {
     if (confirm(`確定要將此人 ${scopeText} 的 ${shiftsToReplace.length} 筆工作，全部移交嗎？\n(將標記為草稿)`)) {
         shiftsToReplace.forEach(shift => {
             markDraft({
-                shiftId: shift['排班ID'], date: shift['日期'], dept: shift['部門名稱'],
-                empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'],
-                end: shift['結束時間'], category: shift['工作類別'],
-                remark1: shift['備註'], remark2: shift['備註2']
+                shiftId: shift['排班ID'], date: shift['日期'], dept: shift['部門名稱'], empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2']
             });
         });
-        document.getElementById('rowActionModal').classList.add('hidden');
-        showToast(`✅ 已移交 ${shiftsToReplace.length} 筆工作`);
-        renderInteractiveGrid();
+        document.getElementById('rowActionModal').classList.add('hidden'); showToast(`✅ 已移交 ${shiftsToReplace.length} 筆工作`); renderInteractiveGrid();
     }
 }
 
 async function clearEmpShifts(scope) {
-    const empId = document.getElementById('raEmpId').value;
-    const dateStr = document.getElementById('interactiveDate').value;
-    const monthStr = dateStr.substring(0, 7);
-    
+    const empId = document.getElementById('raEmpId').value; const dateStr = document.getElementById('interactiveDate').value; const monthStr = dateStr.substring(0, 7);
     let shiftsToDelete = [];
-    if (scope === 'day') {
-        shiftsToDelete = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === empId);
-    } else {
-        shiftsToDelete = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr) && s['員工編號'] === empId);
-    }
+    if (scope === 'day') shiftsToDelete = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === empId);
+    else shiftsToDelete = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'].startsWith(monthStr) && s['員工編號'] === empId);
     
     if (shiftsToDelete.length === 0) return alert(`此人員在該${scope==='day'?'日':'月'}已無任何工作。`);
     
     const scopeText = scope === 'day' ? `【${dateStr} 當日】` : `【${monthStr} 整個月份】`;
     if (confirm(`⚠️ 確定要刪除此人 ${scopeText} 的 ${shiftsToDelete.length} 筆工作嗎？\n(刪除將立即生效)`)) {
-        
-        document.body.style.cursor = 'wait';
-        document.getElementById('rowActionModal').classList.add('hidden');
-        
-        const promises = shiftsToDelete.map(shift => {
-            return fetch(GAS_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'delete_shift', shiftId: shift['排班ID'] })
-            }).then(r => r.json());
-        });
-        
+        document.body.style.cursor = 'wait'; document.getElementById('rowActionModal').classList.add('hidden');
+        const promises = shiftsToDelete.map(shift => fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_shift', shiftId: shift['排班ID'] }) }).then(r => r.json()));
         try {
-            await Promise.all(promises);
-            const idsToDelete = new Set(shiftsToDelete.map(s => s['排班ID']));
-            appData.shifts = appData.shifts.filter(s => !idsToDelete.has(s['排班ID']));
-            showToast(`🗑️ 已成功刪除 ${shiftsToDelete.length} 筆工作`);
-        } catch(e) {
-            alert('刪除過程發生錯誤，請重整頁面確認。');
-        } finally {
-            document.body.style.cursor = 'default';
-            renderInteractiveGrid();
-        }
+            await Promise.all(promises); const idsToDelete = new Set(shiftsToDelete.map(s => s['排班ID']));
+            appData.shifts = appData.shifts.filter(s => !idsToDelete.has(s['排班ID'])); showToast(`🗑️ 已成功刪除 ${shiftsToDelete.length} 筆工作`);
+        } catch(e) { alert('刪除過程發生錯誤，請重整頁面確認。'); } finally { document.body.style.cursor = 'default'; renderInteractiveGrid(); }
     }
 }
 
@@ -345,280 +299,154 @@ function formatDateForInput(dateStr) {
     if(!dateStr) return '';
     try { const d = new Date(dateStr); if(isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; } catch(e) { return ''; }
 }
-
 function openQuickEmpEdit(empId) {
     const emp = appData.staff.find(e => e['員工編號'] === empId); if(!emp) return;
     document.getElementById('qEmpId').value = empId; document.getElementById('qEmpName').innerText = emp['姓名']; document.getElementById('qDept').value = emp['所屬單位'] || '藥學部'; document.getElementById('qAuth').value = emp['權限'] || ''; document.getElementById('qStartDisplay').innerText = emp['啟用時間'] || '無紀錄'; document.getElementById('qStart').value = emp['啟用時間'] || '';
     let endStr = emp['停用時間'] || ''; if(endStr && !endStr.includes('T')) endStr = endStr.replace(' ', 'T'); document.getElementById('qEnd').value = endStr;
     document.getElementById('qCategory').value = emp['所屬類別'] || ''; document.getElementById('qGroup').value = emp['所屬組別'] || ''; document.getElementById('quickEmpModal').classList.remove('hidden');
 }
-
 function handleDeptChange(val) {
     if(val === '離職') {
         const now = new Date(); const yyyy = now.getFullYear(); const mm = String(now.getMonth()+1).padStart(2,'0'); const dd = String(now.getDate()).padStart(2,'0'); const hh = String(now.getHours()).padStart(2,'0'); const min = String(now.getMinutes()).padStart(2,'0'); const ss = String(now.getSeconds()).padStart(2,'0');
         document.getElementById('qEnd').value = `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
     }
 }
-
 async function saveQuickEmpEdit() {
     let endVal = document.getElementById('qEnd').value; if(endVal) endVal = endVal.replace('T', ' '); 
     const updateData = { '所屬單位': document.getElementById('qDept').value, '權限': document.getElementById('qAuth').value, '停用時間': endVal, '所屬類別': document.getElementById('qCategory').value, '所屬組別': document.getElementById('qGroup').value };
     document.getElementById('quickEmpModal').classList.add('hidden');
     await postAction({ action: 'update_employee', empId: document.getElementById('qEmpId').value, updateData });
-    if (!document.getElementById('employeeAdminView').classList.contains('hidden')) {
-        if(typeof renderEmployeeList === 'function') renderEmployeeList();
-    }
+    if (!document.getElementById('employeeAdminView').classList.contains('hidden') && typeof renderEmployeeList === 'function') renderEmployeeList();
 }
 
 // ==========================================
-// 🔄 進階批次承襲工具列 (單日多選 / 單週 / 整月)
+// 🔄 進階批次承襲工具列 (預覽與覆蓋)
 // ==========================================
 let targetDaysList = [];
+let pendingCopyPlan = null;
 
 function toggleCopyMode() {
     const mode = document.querySelector('input[name="copyMode"]:checked').value;
     document.getElementById('copyModeDay').classList.add('hidden');
     document.getElementById('copyModeWeek').classList.add('hidden');
     document.getElementById('copyModeMonth').classList.add('hidden');
-    
-    if (mode === 'day') document.getElementById('copyModeDay').classList.remove('hidden');
-    if (mode === 'week') document.getElementById('copyModeWeek').classList.remove('hidden');
-    if (mode === 'month') document.getElementById('copyModeMonth').classList.remove('hidden');
-}
-
-// -- 單日多選邏輯 --
-function addTargetDay() {
-    const dateInput = document.getElementById('copyTargetDayInput').value;
-    if (!dateInput) return alert('請先選擇目標日期');
-    if (targetDaysList.includes(dateInput)) return alert('日期已在清單中');
-    
-    targetDaysList.push(dateInput);
-    targetDaysList.sort(); 
-    renderTargetDays();
-}
-
-function removeTargetDay(dateStr) {
-    targetDaysList = targetDaysList.filter(d => d !== dateStr);
-    renderTargetDays();
-}
-
-function renderTargetDays() {
-    const container = document.getElementById('targetDaysContainer');
-    if (targetDaysList.length === 0) {
-        container.innerHTML = '<span class="text-xs text-slate-400">尚未加入目標日期...</span>';
-        return;
-    }
-    container.innerHTML = targetDaysList.map(date => 
-        `<span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded flex items-center gap-1 border border-indigo-200 shadow-sm font-mono">
-            ${date} <button onclick="removeTargetDay('${date}')" class="text-red-500 hover:text-red-700 font-bold text-sm leading-none">×</button>
-        </span>`
-    ).join('');
-}
-
-// ==========================================
-// 🔄 進階批次承襲工具列 (支援預覽 Diff 與精準覆蓋)
-// ==========================================
-let targetDaysList = [];
-let pendingCopyPlan = null; // 暫存要執行的覆蓋計畫
-
-function toggleCopyMode() {
-    const mode = document.querySelector('input[name="copyMode"]:checked').value;
-    document.getElementById('copyModeDay').classList.add('hidden');
-    document.getElementById('copyModeWeek').classList.add('hidden');
-    document.getElementById('copyModeMonth').classList.add('hidden');
-    
     if (mode === 'day') document.getElementById('copyModeDay').classList.remove('hidden');
     if (mode === 'week') document.getElementById('copyModeWeek').classList.remove('hidden');
     if (mode === 'month') document.getElementById('copyModeMonth').classList.remove('hidden');
 }
 
 function setMonday(elementId) {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    const yyyy = monday.getFullYear();
-    const mm = String(monday.getMonth() + 1).padStart(2, '0');
-    const dd = String(monday.getDate()).padStart(2, '0');
+    const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff)); const yyyy = monday.getFullYear(); const mm = String(monday.getMonth() + 1).padStart(2, '0'); const dd = String(monday.getDate()).padStart(2, '0');
     document.getElementById(elementId).value = `${yyyy}-${mm}-${dd}`;
 }
 
 function addTargetDay() {
     const dateInput = document.getElementById('copyTargetDayInput').value;
-    if (!dateInput) return alert('請先選擇目標日期');
-    if (targetDaysList.includes(dateInput)) return alert('日期已在清單中');
+    if (!dateInput) return alert('請先選擇目標日期'); if (targetDaysList.includes(dateInput)) return alert('日期已在清單中');
     targetDaysList.push(dateInput); targetDaysList.sort(); renderTargetDays();
 }
-
-function removeTargetDay(dateStr) {
-    targetDaysList = targetDaysList.filter(d => d !== dateStr); renderTargetDays();
-}
+function removeTargetDay(dateStr) { targetDaysList = targetDaysList.filter(d => d !== dateStr); renderTargetDays(); }
 
 function renderTargetDays() {
     const container = document.getElementById('targetDaysContainer');
     if (targetDaysList.length === 0) return container.innerHTML = '<span class="text-xs text-slate-400">尚未加入目標日期...</span>';
-    container.innerHTML = targetDaysList.map(date => 
-        `<span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded flex items-center gap-1 border border-indigo-200 shadow-sm font-mono">${date} <button onclick="removeTargetDay('${date}')" class="text-red-500 hover:text-red-700 font-bold text-sm leading-none">×</button></span>`
-    ).join('');
+    container.innerHTML = targetDaysList.map(date => `<span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded flex items-center gap-1 border border-indigo-200 shadow-sm font-mono">${date} <button onclick="removeTargetDay('${date}')" class="text-red-500 hover:text-red-700 font-bold text-sm leading-none">×</button></span>`).join('');
 }
 
-// === 核心預覽邏輯 ===
 function previewCopyDay() {
     const sourceDate = document.getElementById('copySourceDay').value;
-    if (!sourceDate) return alert('請選擇來源日期');
-    if (targetDaysList.length === 0) return alert('請加入至少一個目標日期');
-    
+    if (!sourceDate) return alert('請選擇來源日期'); if (targetDaysList.length === 0) return alert('請加入至少一個目標日期');
     const sourceShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === sourceDate && s['員工編號'] !== 'SYS_REMARK');
     if (sourceShifts.length === 0) return alert(`來源日期 ${sourceDate} 無任何排班資料。`);
-    
     generatePreviewAndOpenModal(sourceShifts, targetDaysList, targetDaysList[0], 'day');
 }
 
 function previewCopyWeek() {
-    const sourceWeek = document.getElementById('copySourceWeek').value;
-    const targetWeek = document.getElementById('copyTargetWeek').value;
+    const sourceWeek = document.getElementById('copySourceWeek').value; const targetWeek = document.getElementById('copyTargetWeek').value;
     if (!sourceWeek || !targetWeek) return alert('請選擇來源與目標週的起始日');
-    
     let sDate = new Date(sourceWeek); let tDate = new Date(targetWeek);
     if (sDate.getDay() !== tDate.getDay() && !confirm(`⚠️ 警告：起始「星期幾」不同！系統將無視差異向後排 7 天，確定嗎？`)) return;
     
     let mapping = [];
     for (let i = 0; i < 7; i++) {
-        let currS = new Date(sDate); currS.setDate(currS.getDate() + i);
-        let currT = new Date(tDate); currT.setDate(currT.getDate() + i);
-        let sStr = `${currS.getFullYear()}-${String(currS.getMonth()+1).padStart(2,'0')}-${String(currS.getDate()).padStart(2,'0')}`;
-        let tStr = `${currT.getFullYear()}-${String(currT.getMonth()+1).padStart(2,'0')}-${String(currT.getDate()).padStart(2,'0')}`;
+        let currS = new Date(sDate); currS.setDate(currS.getDate() + i); let currT = new Date(tDate); currT.setDate(currT.getDate() + i);
+        let sStr = `${currS.getFullYear()}-${String(currS.getMonth()+1).padStart(2,'0')}-${String(currS.getDate()).padStart(2,'0')}`; let tStr = `${currT.getFullYear()}-${String(currT.getMonth()+1).padStart(2,'0')}-${String(currT.getDate()).padStart(2,'0')}`;
         mapping.push({ src: sStr, tgt: tStr });
     }
     
-    let previewHtml = '';
-    let totalToUpsert = [];
-    let totalToDelete = [];
-    
+    let previewHtml = ''; let totalToUpsert = []; let totalToDelete = [];
     mapping.forEach(pair => {
         const sourceShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === pair.src && s['員工編號'] !== 'SYS_REMARK');
         const oldShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === pair.tgt && s['員工編號'] !== 'SYS_REMARK');
-        
         const res = calcCopyDiff(pair.tgt, sourceShifts, oldShifts);
-        totalToUpsert.push(...res.toUpsert);
-        totalToDelete.push(...res.toDelete);
-        previewHtml += res.html;
+        totalToUpsert.push(...res.toUpsert); totalToDelete.push(...res.toDelete); previewHtml += res.html;
     });
     
     pendingCopyPlan = { toUpsert: totalToUpsert, toDelete: totalToDelete, jumpDate: targetWeek, mode: 'week' };
-    document.getElementById('copyPreviewContent').innerHTML = previewHtml;
-    document.getElementById('copyPreviewModal').classList.remove('hidden');
+    document.getElementById('copyPreviewContent').innerHTML = previewHtml; document.getElementById('copyPreviewModal').classList.remove('hidden');
 }
 
 function generatePreviewAndOpenModal(sourceShifts, targetDates, jumpDate, mode) {
-    let previewHtml = '';
-    let totalToUpsert = [];
-    let totalToDelete = [];
-    
+    let previewHtml = ''; let totalToUpsert = []; let totalToDelete = [];
     targetDates.forEach(tDate => {
         const oldShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === tDate && s['員工編號'] !== 'SYS_REMARK');
         const res = calcCopyDiff(tDate, sourceShifts, oldShifts);
-        totalToUpsert.push(...res.toUpsert);
-        totalToDelete.push(...res.toDelete);
-        previewHtml += res.html;
+        totalToUpsert.push(...res.toUpsert); totalToDelete.push(...res.toDelete); previewHtml += res.html;
     });
-    
     pendingCopyPlan = { toUpsert: totalToUpsert, toDelete: totalToDelete, jumpDate: jumpDate, mode: mode };
-    document.getElementById('copyPreviewContent').innerHTML = previewHtml;
-    document.getElementById('copyPreviewModal').classList.remove('hidden');
+    document.getElementById('copyPreviewContent').innerHTML = previewHtml; document.getElementById('copyPreviewModal').classList.remove('hidden');
 }
 
-// 計算差異並保留舊 ID 以最小化刪除 (Smart Diff & Merge)
 function calcCopyDiff(tDate, sourceShifts, oldShifts) {
-    let toDelete = [];
-    let toUpsert = [];
+    let toDelete = []; let toUpsert = [];
     let html = `<div class="bg-white p-3 rounded shadow-sm border border-slate-200"><div class="font-bold text-indigo-700 border-b pb-1 mb-2">📅 目標：${tDate}</div><div class="space-y-1">`;
     let diffCount = 0;
     
-    let oldMap = new Map();
-    oldShifts.forEach(s => oldMap.set(s['員工編號'], s));
+    let oldMap = new Map(); oldShifts.forEach(s => oldMap.set(s['員工編號'], s));
     
     sourceShifts.forEach(sShift => {
-        let empId = sShift['員工編號'];
-        let empName = appData.staff.find(e => e['員工編號'] === empId)?.['姓名'] || empId;
+        let empId = sShift['員工編號']; let empName = appData.staff.find(e => e['員工編號'] === empId)?.['姓名'] || empId;
         let shiftId = '';
-        
         if (oldMap.has(empId)) {
-            let oldS = oldMap.get(empId);
-            shiftId = oldS['排班ID']; // 沿用舊 ID，進行覆蓋
+            let oldS = oldMap.get(empId); shiftId = oldS['排班ID']; 
             html += `<div class="text-xs flex items-center gap-2"><span class="bg-yellow-100 text-yellow-700 px-1 rounded border border-yellow-200">🔄 覆蓋</span> <span class="font-bold">${empName}</span>：[${oldS['工作名稱']}] ➡️ [${sShift['工作名稱']}]</div>`;
             oldMap.delete(empId);
         } else {
-            shiftId = 'C' + new Date().getTime() + Math.random().toString(36).substr(2, 5); // 產生新 ID
+            shiftId = 'C' + new Date().getTime() + Math.random().toString(36).substr(2, 5);
             html += `<div class="text-xs flex items-center gap-2"><span class="bg-green-100 text-green-700 px-1 rounded border border-green-200">➕ 新增</span> <span class="font-bold">${empName}</span>：排入 [${sShift['工作名稱']}]</div>`;
         }
         diffCount++;
-        
-        toUpsert.push({
-            shiftId: shiftId, date: tDate, dept: sShift['部門名稱'], empId: empId, task: sShift['工作名稱'], 
-            start: sShift['開始時間'], end: sShift['結束時間'], category: sShift['工作類別'], remark1: sShift['備註'], remark2: sShift['備註2']
-        });
+        toUpsert.push({ shiftId, date: tDate, dept: sShift['部門名稱'], empId, task: sShift['工作名稱'], start: sShift['開始時間'], end: sShift['結束時間'], category: sShift['工作類別'], remark1: sShift['備註'], remark2: sShift['備註2'] });
     });
     
-    // 剩下的 oldMap 就是目標日有，但來源日沒有的，必須刪除
     oldMap.forEach((oldS, empId) => {
         let empName = appData.staff.find(e => e['員工編號'] === empId)?.['姓名'] || empId;
         html += `<div class="text-xs flex items-center gap-2"><span class="bg-red-100 text-red-700 px-1 rounded border border-red-200">🗑️ 清空</span> <span class="font-bold">${empName}</span>：移除現有 [${oldS['工作名稱']}]</div>`;
-        toDelete.push(oldS);
-        diffCount++;
+        toDelete.push(oldS); diffCount++;
     });
     
     if (diffCount === 0) html += `<div class="text-xs text-slate-400">來源與目標均為空，無異動</div>`;
     html += `</div></div>`;
-    
     return { toUpsert, toDelete, html };
 }
 
-// === 確認覆蓋並寫入草稿 / API ===
 async function confirmCopyOverwrite() {
     if (!pendingCopyPlan) return;
+    document.body.style.cursor = 'wait'; document.getElementById('copyPreviewModal').classList.add('hidden');
     
-    document.body.style.cursor = 'wait';
-    document.getElementById('copyPreviewModal').classList.add('hidden');
-    
-    // 1. 如果有需要清空的排班，打 API 刪除 (因為草稿模式不支援刪除)
     if (pendingCopyPlan.toDelete.length > 0) {
         const idsToDelete = new Set(pendingCopyPlan.toDelete.map(s => s['排班ID']));
-        const promises = Array.from(idsToDelete).map(id => {
-            return fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_shift', shiftId: id }) }).then(r => r.json());
-        });
-        try {
-            await Promise.all(promises);
-            appData.shifts = appData.shifts.filter(s => !idsToDelete.has(s['排班ID']));
-        } catch(e) { console.error("清空舊班表失敗", e); }
+        const promises = Array.from(idsToDelete).map(id => fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_shift', shiftId: id }) }).then(r => r.json()));
+        try { await Promise.all(promises); appData.shifts = appData.shifts.filter(s => !idsToDelete.has(s['排班ID'])); } catch(e) { console.error("清空舊班表失敗", e); }
     }
     
-    // 2. 標記覆蓋與新增的班表為草稿
     pendingCopyPlan.toUpsert.forEach(draft => markDraft(draft));
-    
     document.body.style.cursor = 'default';
     showToast(`✅ 承襲覆蓋成功！新增/修改 ${pendingCopyPlan.toUpsert.length} 筆 (草稿)，清空 ${pendingCopyPlan.toDelete.length} 筆。`);
     
     if (pendingCopyPlan.jumpDate) document.getElementById('interactiveDate').value = pendingCopyPlan.jumpDate;
     if (pendingCopyPlan.mode === 'day') { targetDaysList = []; renderTargetDays(); }
     
-    pendingCopyPlan = null;
-    renderInteractiveGrid();
-}
-
-
-
-// === 捷徑：自動選取本週一 ===
-function setMonday(elementId) {
-    const d = new Date();
-    const day = d.getDay();
-    // 算出距離本週一差幾天 (若為週日 day=0，則往前推 6 天)
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    
-    const yyyy = monday.getFullYear();
-    const mm = String(monday.getMonth() + 1).padStart(2, '0');
-    const dd = String(monday.getDate()).padStart(2, '0');
-    
-    document.getElementById(elementId).value = `${yyyy}-${mm}-${dd}`;
+    pendingCopyPlan = null; renderInteractiveGrid();
 }
