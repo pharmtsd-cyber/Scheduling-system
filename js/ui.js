@@ -7,7 +7,8 @@ function showToast(msg = "已儲存") {
 
 function hideAllViews() {
     ['welcomeMsg', 'publicView', 'adminView', 'employeeAdminView', 'taskAdminView'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden'); // 加入安全判斷，避免未來找不到元素時當機
     });
 }
 
