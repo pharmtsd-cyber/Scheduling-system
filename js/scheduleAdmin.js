@@ -29,42 +29,21 @@ function getMixedDeptStaff(monthStr) {
     });
     deptStaffMap.delete('SYS_REMARK'); 
     deptStaffMap.delete('SYS_TEMPLATE');
-    
-    deptStaffMap.set('', { '員工編號': '', '姓名': '⚠️ 待指派工作', '所屬單位': currentDept, '所屬組別': currentDept });
+    deptStaffMap.delete(''); // 確保不會把空字串當作實體人員
     
     let deptStaff = Array.from(deptStaffMap.values());
     deptStaff.sort((a, b) => {
-        if (a['員工編號'] === '') return -1; 
-        if (b['員工編號'] === '') return 1;
         let idxA = customStaffOrder.indexOf(a['員工編號']); let idxB = customStaffOrder.indexOf(b['員工編號']);
         return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
     });
     return { deptStaff, deptStaffMap };
 }
 
-function buildEmpSelectOptions(deptStaffMap, selectedEmpId = '') {
-    let options = `<option value="" ${selectedEmpId === '' ? 'selected' : ''}>-- ⚠️ 未指派 (待補人) --</option>`;
-    options += `<optgroup label="本單位 / 本月相關人員">`;
-    Array.from(deptStaffMap.values()).forEach(emp => {
-        if (emp['員工編號'] === '') return; 
-        const selected = emp['員工編號'] === selectedEmpId ? 'selected' : '';
-        options += `<option value="${emp['員工編號']}" ${selected}>${emp['姓名']}</option>`;
-    });
-    options += `</optgroup><optgroup label="全院其他人員 (無限制跨單位支援)">`;
-    appData.staff.forEach(emp => {
-        if (!deptStaffMap.has(emp['員工編號']) && !emp['員工編號'].startsWith('SYS_') && emp['所屬單位'] !== '離職') {
-            const selected = emp['員工編號'] === selectedEmpId ? 'selected' : '';
-            options += `<option value="${emp['員工編號']}" ${selected}>${emp['姓名']} (${emp['所屬組別']||'無'})</option>`;
-        }
-    });
-    options += `</optgroup>`;
-    return options;
-}
-
+// ⚠️ 防呆攔截器：檢查修改的日期是否綁定模板
 function guardTemplate(dateStr, callback) {
     const sysTemp = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
     if (sysTemp) {
-        if(confirm(`⚠️ 注意：本日已套用模板【${sysTemp['備註']}】。\n\n您現在的修改將會使本日與該模板【脫鉤】(僅變更本日班表)。\n如有需要異動一個月的工作，請退回並直接修改模板。\n\n確定要脫鉤並修改本日嗎？`)) {
+        if(confirm(`⚠️ 注意：本日已套用模板【${sysTemp['備註']}】。\n\n您現在的修改將會使本日與該模板【脫鉤】(僅變更本日班表)。\n如有需要異動整個模板的工作，請退回並直接修改模板。\n\n確定要脫鉤並修改本日嗎？`)) {
             markDraft({
                 shiftId: sysTemp['排班ID'], date: dateStr, dept: currentDept, empId: 'SYS_TEMPLATE',
                 task: 'SYS_DECOUPLED', start: '00:00', end: '00:00', category: 'SYS', remark1: sysTemp['備註'], remark2: ''
@@ -74,6 +53,7 @@ function guardTemplate(dateStr, callback) {
     } else { callback(); }
 }
 
+// ✂️ 手動明確脫鉤
 function manualDecouple(dateStr) {
     if(confirm('確定要解除此日的模板綁定嗎？\n解除後即可自由修改排班，且系統不會再跳出警告。')) {
         const sysTemp = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && s['員工編號'] === 'SYS_TEMPLATE');
@@ -98,6 +78,7 @@ function renderInteractiveGrid() {
 
     const shifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === date);
     
+    // 渲染右上角模板狀態
     const activeTemplate = shifts.find(s => s['員工編號'] === 'SYS_TEMPLATE' && s['工作名稱'] !== 'SYS_DECOUPLED');
     const statusContainer = document.getElementById('dailyTemplateStatus');
     if (statusContainer) {
@@ -137,9 +118,55 @@ function renderInteractiveGrid() {
     </div>`;
     container.innerHTML += headerHtml;
 
+    // 1. 繪製「待指派工作池」 (每筆未指派的工作獨立一列)
+    const unassignedShifts = shifts.filter(s => s['員工編號'] === '');
+    unassignedShifts.forEach(shift => {
+        let shiftId = shift['排班ID'];
+        let r1 = shift['備註'] || '';
+        let r2 = shift['備註2'] || '';
+        const [sh, sm] = (shift['開始時間'] || '08:00').split(':').map(Number);
+        const [eh, em] = (shift['結束時間'] || '09:00').split(':').map(Number);
+        const left = ((sh - 8) + sm/60) / 14 * 100;
+        const width = ((eh - sh) + (em - sm)/60) / 14 * 100;
+
+        let rowHtml = `<div class="flex timeline-container group transition bg-amber-50/40 border-b-2 border-dashed border-amber-300 h-[50px]">
+            <div class="w-24 p-1 border-r bg-amber-100/60 border-r-amber-300 flex flex-col items-center justify-center shadow-sm z-10 shrink-0">
+                <div class="font-bold text-amber-800 cursor-pointer hover:bg-amber-200 py-1 rounded w-full text-center flex flex-col shadow-sm border border-amber-300 bg-amber-50" 
+                     onclick="guardTemplate('${date}', () => openStaffPicker('', currentDept, (newEmp) => updateShiftEmp('${shiftId}', newEmp)))">
+                    <span class="text-sm">⚠️ 待指派</span>
+                    <span class="text-[9px] text-amber-600 mt-0.5">👆 點擊派工</span>
+                </div>
+            </div>
+            
+            <div class="w-32 border-r bg-amber-50/50 border-r-amber-300 flex items-center p-1 shrink-0">
+                <input type="text" class="w-full h-full text-xs p-1 border-transparent focus:border-amber-400 focus:ring-1 rounded bg-white text-amber-900 font-bold"
+                       placeholder="輸入備註..." value="${r1}" onblur="guardTemplate('${date}', () => updateShiftRemarks('${shiftId}', this.value, null))">
+            </div>
+            
+            <div class="flex-1 relative drop-zone" ondragover="allowDrop(event)" ondrop="guardTemplate('${date}', () => dropShift(event, ''))">
+                <div class="absolute inset-0 flex pointer-events-none opacity-20">`;
+        for(let i=8; i<=21; i++) rowHtml += `<div class="flex-1 border-l border-slate-400"></div><div class="flex-1 border-l border-dashed border-slate-400"></div>`;
+        rowHtml += `</div>
+                <div class="absolute top-[4px] bottom-[4px] bg-amber-100 border-2 border-dashed border-amber-500 hover:bg-amber-200 shadow-md rounded flex flex-col justify-center items-center cursor-grab active:cursor-grabbing transition overflow-hidden z-10"
+                     draggable="true" ondragstart="dragShift(event, '${shiftId}')" style="left:${left}%; width:${width}%;">
+                    <div class="font-bold text-amber-900 text-xs truncate w-full text-center px-1 flex justify-center items-center gap-1">
+                        <span class="cursor-pointer hover:opacity-70" onclick="guardTemplate('${date}', () => openShiftModal('${shiftId}'))">${shift['工作名稱']}</span>
+                        <button onclick="copyShift('${shiftId}')" class="text-amber-600 hover:text-amber-900 text-[10px]">📋</button>
+                    </div>
+                    <div class="text-[9px] text-amber-700 font-semibold mt-[2px]">${shift['開始時間']} - ${shift['結束時間']}</div>
+                </div>
+            </div>
+            
+            <div class="w-40 border-l bg-amber-50/50 border-l-amber-300 flex items-center p-1 shrink-0">
+                <input type="text" class="w-full h-full text-xs p-1 border-transparent focus:border-amber-400 focus:ring-1 rounded bg-white text-amber-900"
+                       placeholder="補充說明..." value="${r2}" onblur="guardTemplate('${date}', () => updateShiftRemarks('${shiftId}', null, this.value))">
+            </div>
+        </div>`; 
+        container.innerHTML += rowHtml;
+    });
+
+    // 2. 繪製「已指派」的正常班表
     deptStaff.forEach(emp => {
-        const isDummy = emp['員工編號'] === ''; 
-        
         const myShifts = shifts.filter(s => s['員工編號'] == emp['員工編號']);
         let mainShift = myShifts.length > 0 ? myShifts[0] : null;
         let shiftId = mainShift ? mainShift['排班ID'] : '';
@@ -147,25 +174,19 @@ function renderInteractiveGrid() {
         let r2 = mainShift ? (mainShift['備註2'] || '') : '';
         
         let empStatusTag = '';
-        if (isDummy) empStatusTag = `<span class="text-[9px] text-amber-700 bg-amber-100 rounded px-1 border border-amber-300 animate-pulse font-bold mt-0.5 shadow-sm">拖曳黃色方塊派工給下方</span>`;
-        else if (emp['所屬單位'] === '離職') empStatusTag = `<span class="text-[9px] text-red-500 bg-red-50 rounded px-1 border border-red-200 mt-0.5">離職</span>`;
+        if (emp['所屬單位'] === '離職') empStatusTag = `<span class="text-[9px] text-red-500 bg-red-50 rounded px-1 border border-red-200 mt-0.5">離職</span>`;
         else if (emp['所屬組別'] !== currentDept) empStatusTag = `<span class="text-[9px] text-purple-600 bg-purple-50 rounded px-1 border border-purple-200 mt-0.5" title="跨單位支援">外援</span>`;
 
-        let rowClass = isDummy ? 'bg-amber-50/30 border-b-2 border-dashed border-amber-400' : 'bg-white hover:bg-slate-50 border-b border-slate-200';
-        let dragProps = isDummy ? '' : `draggable="true" ondragstart="dragRow(event, '${emp['員工編號']}')" ondragover="allowDrop(event)" ondrop="dropRow(event, '${emp['員工編號']}')"`;
-        let nameActionHtml = isDummy ? 
-            `<span class="text-amber-800 text-sm font-extrabold tracking-wide">${emp['姓名']}</span>` : 
-            `<span class="text-blue-700 cursor-pointer hover:bg-blue-50 py-1 rounded w-full text-center" onclick="openRowActionModal('${emp['員工編號']}')">${emp['姓名']} <span class="text-slate-400 text-xs">⚙️</span></span>`;
-
-        let rowHtml = `<div class="flex timeline-container group transition ${rowClass} h-[50px]">
-            <div class="w-24 p-1 border-r ${isDummy ? 'bg-amber-100/60 border-r-amber-300' : 'bg-white border-r-slate-200'} flex flex-col items-center justify-center shadow-sm z-10 relative ${isDummy ? '' : 'cursor-ns-resize'} shrink-0" ${dragProps}>
+        let rowHtml = `<div class="flex timeline-container group transition bg-white hover:bg-slate-50 border-b border-slate-200 h-[50px]">
+            <div class="w-24 p-1 border-r bg-white border-r-slate-200 flex flex-col items-center justify-center shadow-sm z-10 relative cursor-ns-resize shrink-0" 
+                 draggable="true" ondragstart="dragRow(event, '${emp['員工編號']}')" ondragover="allowDrop(event)" ondrop="dropRow(event, '${emp['員工編號']}')">
                 <div class="font-bold truncate w-full text-center flex flex-col items-center gap-0">
-                    ${nameActionHtml} ${empStatusTag}
+                    <span class="text-blue-700 cursor-pointer hover:bg-blue-50 py-1 rounded w-full text-center" onclick="openRowActionModal('${emp['員工編號']}')">${emp['姓名']} <span class="text-slate-400 text-xs">⚙️</span></span> ${empStatusTag}
                 </div>
-                ${(clipboardShift && !isDummy) ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[9px] bg-indigo-100 text-indigo-700 px-2 mt-1 rounded shadow hover:bg-indigo-200">📋貼上</button>` : ''}
+                ${clipboardShift ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[9px] bg-indigo-100 text-indigo-700 px-2 mt-1 rounded shadow hover:bg-indigo-200">📋貼上</button>` : ''}
             </div>
             
-            <div class="w-32 border-r ${isDummy ? 'bg-amber-50/50 border-r-amber-300' : 'bg-blue-50/50 border-r-slate-200'} flex items-center p-1 shrink-0">
+            <div class="w-32 border-r bg-blue-50/50 border-r-slate-200 flex items-center p-1 shrink-0">
                 <input type="text" class="w-full h-full text-xs p-1 border-transparent focus:border-blue-400 focus:ring-1 rounded bg-white text-blue-800 font-bold"
                        placeholder="${mainShift ? '輸入備註...' : ''}" value="${r1}" ${mainShift ? `onblur="guardTemplate('${date}', () => updateShiftRemarks('${shiftId}', this.value, null))"` : 'disabled'}>
             </div>
@@ -176,26 +197,22 @@ function renderInteractiveGrid() {
         for(let i=8; i<=21; i++) rowHtml += `<div class="flex-1 border-l border-slate-400"></div><div class="flex-1 border-l border-dashed border-slate-400"></div>`;
         rowHtml += `</div>`;
 
-        // ★ 核心：針對虛擬列的工作給予獨特的視覺特效
         myShifts.forEach(shift => {
             const [sh, sm] = (shift['開始時間'] || '08:00').split(':').map(Number);
             const [eh, em] = (shift['結束時間'] || '09:00').split(':').map(Number);
             const left = ((sh - 8) + sm/60) / 14 * 100;
             const width = ((eh - sh) + (em - sm)/60) / 14 * 100;
-            
-            let shiftBg = isDummy ? 'bg-amber-100 border-2 border-dashed border-amber-500 hover:bg-amber-200 shadow-md' : 'bg-blue-100 border border-blue-400 hover:bg-blue-200 shadow-sm';
-            let shiftTextColor = isDummy ? 'text-amber-900' : 'text-blue-900';
 
-            rowHtml += `<div class="absolute top-[4px] bottom-[4px] ${shiftBg} rounded flex flex-col justify-center items-center cursor-grab active:cursor-grabbing transition overflow-hidden z-10"
+            rowHtml += `<div class="absolute top-[4px] bottom-[4px] bg-blue-100 border border-blue-400 rounded shadow-sm flex flex-col justify-center items-center cursor-grab active:cursor-grabbing hover:bg-blue-200 transition overflow-hidden z-10"
                              draggable="true" ondragstart="dragShift(event, '${shift['排班ID']}')" style="left:${left}%; width:${width}%;">
-                <div class="font-bold ${shiftTextColor} text-xs truncate w-full text-center px-1 flex justify-center items-center gap-1">
-                    <span class="cursor-pointer hover:opacity-70" onclick="guardTemplate('${date}', () => openShiftModal('${shift['排班ID']}'))">${shift['工作名稱']}</span>
-                    <button onclick="copyShift('${shift['排班ID']}')" class="${isDummy ? 'text-amber-600 hover:text-amber-900' : 'text-slate-400 hover:text-indigo-700'} text-[10px]">📋</button>
+                <div class="font-bold text-blue-900 text-xs truncate w-full text-center px-1 flex justify-center items-center gap-1">
+                    <span class="cursor-pointer hover:text-blue-600" onclick="guardTemplate('${date}', () => openShiftModal('${shift['排班ID']}'))">${shift['工作名稱']}</span>
+                    <button onclick="copyShift('${shift['排班ID']}')" class="text-slate-400 hover:text-indigo-700 text-[10px]">📋</button>
                 </div>
-                <div class="text-[9px] ${isDummy ? 'text-amber-700' : 'text-slate-600'} font-semibold mt-[2px]">${shift['開始時間']} - ${shift['結束時間']}</div>
+                <div class="text-[9px] text-slate-600 font-semibold mt-[2px]">${shift['開始時間']} - ${shift['結束時間']}</div>
             </div>`;
         });
-        rowHtml += `</div><div class="w-40 border-l ${isDummy ? 'bg-amber-50/50 border-l-amber-300' : 'bg-teal-50/50 border-l-slate-200'} flex items-center p-1 shrink-0">
+        rowHtml += `</div><div class="w-40 border-l bg-teal-50/50 border-l-slate-200 flex items-center p-1 shrink-0">
             <input type="text" class="w-full h-full text-xs p-1 border-transparent focus:border-teal-400 focus:ring-1 rounded bg-white text-teal-800"
                    placeholder="${mainShift ? '補充說明...' : ''}" value="${r2}" ${mainShift ? `onblur="guardTemplate('${date}', () => updateShiftRemarks('${shiftId}', null, this.value))"` : 'disabled'}>
         </div></div>`; 
@@ -208,6 +225,10 @@ function renderInteractiveGrid() {
     </div>`;
     container.innerHTML += bottomRemarkHtml;
 }
+
+// ==========================================
+// 🏷️ 版本模板中心邏輯
+// ==========================================
 
 function renderTemplateSelect() {
     const selApply = document.getElementById('applyTempSelect');
@@ -251,6 +272,7 @@ async function saveCurrentAsTemplate() {
     if (updateId) { const tempInfo = appData.templates.find(t => t['模板ID'] === updateId); if (tempInfo) targetName = newName || tempInfo['模板名稱']; } 
     else { if (!newName) return alert('請輸入新模板名稱！'); targetId = 'T' + new Date().getTime(); }
     
+    // 將畫面排班取出存檔 (排除 SYS_ 開頭，但保留 '' 空字串的人員作為待指派工作)
     const currentShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === dateStr && !s['員工編號'].startsWith('SYS_'));
     if (currentShifts.length === 0) return alert('本日無任何排班，無法存為模板。');
     
@@ -278,7 +300,9 @@ function executeApplyTemplate() {
     targetDates.forEach(tDate => {
         const oldShifts = appData.shifts.filter(s => s['部門名稱'] === currentDept && s['日期'] === tDate && !s['員工編號'].startsWith('SYS_'));
         oldShifts.forEach(oldS => { appData.shifts = appData.shifts.filter(s => s['排班ID'] !== oldS['排班ID']); });
+        
         sourceShifts.forEach(shift => { markDraft({ shiftId: 'C' + new Date().getTime() + Math.random().toString(36).substr(2, 5), date: tDate, dept: currentDept, empId: shift['員工編號'], task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); });
+        
         const oldSys = appData.shifts.find(s => s['部門名稱'] === currentDept && s['日期'] === tDate && s['員工編號'] === 'SYS_TEMPLATE');
         markDraft({ shiftId: oldSys ? oldSys['排班ID'] : 'T_LNK' + tDate.replace(/-/g,''), date: tDate, dept: currentDept, empId: 'SYS_TEMPLATE', task: tempId, start: '00:00', end: '00:00', category: 'SYS', remark1: template['模板名稱'], remark2: '' });
     });
@@ -311,23 +335,27 @@ function previewSelectedTemplate(type) {
     document.getElementById('tpContent').innerHTML = html; document.getElementById('templatePreviewModal').classList.remove('hidden');
 }
 
-function saveDailyRemark(shiftId, topVal, bottomVal) { const existing = appData.shifts.find(s => s['排班ID'] === shiftId) || {}; markDraft({ shiftId, date: document.getElementById('interactiveDate').value, dept: currentDept, empId: 'SYS_REMARK', task: 'SYS_REMARK', start: '00:00', end: '00:00', category: 'SYS', remark1: topVal !== null ? topVal : (existing['備註'] || ''), remark2: bottomVal !== null ? bottomVal : (existing['備註2'] || '') }); }
-function updateShiftRemarks(shiftId, r1, r2) { const shift = appData.shifts.find(s => s['排班ID'] === shiftId); if(shift) { markDraft({ shiftId, date: shift['日期'], dept: shift['部門名稱'], empId: shift['員工編號'], task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: r1 !== null ? r1 : shift['備註'], remark2: r2 !== null ? r2 : shift['備註2'] }); } }
-function copyShift(shiftId) { clipboardShift = appData.shifts.find(s => s['排班ID'] === shiftId); showToast("✅ 已複製"); renderInteractiveGrid(); }
-function pasteShift(empId) { if (!clipboardShift) return; openShiftModal(); document.getElementById('modalEmp').value = empId; document.getElementById('modalTask').value = clipboardShift['工作名稱']; document.getElementById('modalStart').value = clipboardShift['開始時間']; document.getElementById('modalEnd').value = clipboardShift['結束時間']; document.getElementById('modalCat').value = clipboardShift['工作類別']; document.getElementById('modalRemark1').value = clipboardShift['備註'] || ''; document.getElementById('modalRemark2').value = clipboardShift['備註2'] || ''; document.getElementById('modalTitle').innerText = '📋 貼上工作'; }
-function allowDrop(ev) { ev.preventDefault(); }
-function dragRow(ev, empId) { ev.dataTransfer.setData("rowEmpId", empId); }
-function dropRow(ev, targetEmpId) { ev.preventDefault(); ev.stopPropagation(); const sourceEmpId = ev.dataTransfer.getData("rowEmpId"); if (sourceEmpId && sourceEmpId !== targetEmpId) { if (!customStaffOrder.includes(sourceEmpId)) customStaffOrder.push(sourceEmpId); if (!customStaffOrder.includes(targetEmpId)) customStaffOrder.push(targetEmpId); const sourceIdx = customStaffOrder.indexOf(sourceEmpId); const targetIdx = customStaffOrder.indexOf(targetEmpId); if (sourceIdx !== -1 && targetIdx !== -1) { customStaffOrder.splice(sourceIdx, 1); customStaffOrder.splice(targetIdx, 0, sourceEmpId); renderInteractiveGrid(); } } }
-function dragShift(ev, shiftId) { ev.dataTransfer.setData("shiftId", shiftId); ev.stopPropagation(); }
-function dropShift(ev, newEmpId) { ev.preventDefault(); const shiftId = ev.dataTransfer.getData("shiftId"); if(!shiftId) return; const shift = appData.shifts.find(s => s['排班ID'] === shiftId); if(shift && shift['員工編號'] !== newEmpId) { markDraft({ shiftId: shift['排班ID'], date: shift['日期'], dept: shift['部門名稱'], empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); renderInteractiveGrid(); } }
+// ==========================================
+// 輔助更新與操作邏輯
+// ==========================================
+
+function updateShiftEmp(shiftId, newEmpId) {
+    const shift = appData.shifts.find(s => s['排班ID'] === shiftId);
+    if (shift) { markDraft({ ...shift, empId: newEmpId }); renderInteractiveGrid(); }
+}
+
+function updateModalEmp(empId) {
+    document.getElementById('modalEmp').value = empId;
+    document.getElementById('txtModalEmp').innerText = getEmpNameWithDefault(empId, '-- ⚠️ 未指派 (留空) --');
+}
 
 function openShiftModal(shiftId = null) {
     const modal = document.getElementById('shiftModal');
-    const { deptStaffMap } = getMixedDeptStaff(document.getElementById('interactiveDate').value.substring(0,7));
     const deptTasks = appData.tasks.filter(t => t['部門名稱'] === currentDept || !t['部門名稱']);
     
     let selectedEmpId = shiftId ? (appData.shifts.find(s => s['排班ID'] === shiftId)?.['員工編號'] || '') : '';
-    document.getElementById('modalEmp').innerHTML = buildEmpSelectOptions(deptStaffMap, selectedEmpId);
+    updateModalEmp(selectedEmpId);
+    
     document.getElementById('modalTask').innerHTML = deptTasks.map(t => `<option value="${t['工作名稱']}">${t['工作名稱']}</option>`).join('');
     
     if(shiftId) {
@@ -342,12 +370,25 @@ function closeShiftModal() { document.getElementById('shiftModal').classList.add
 function saveShift() { guardTemplate(document.getElementById('interactiveDate').value, () => { markDraft({ shiftId: document.getElementById('modalShiftId').value, date: document.getElementById('interactiveDate').value, dept: currentDept, empId: document.getElementById('modalEmp').value, task: document.getElementById('modalTask').value, start: document.getElementById('modalStart').value, end: document.getElementById('modalEnd').value, category: document.getElementById('modalCat').value, remark1: document.getElementById('modalRemark1').value, remark2: document.getElementById('modalRemark2').value }); closeShiftModal(); renderInteractiveGrid(); }); }
 async function deleteShift() { guardTemplate(document.getElementById('interactiveDate').value, async () => { if(confirm("確定刪除此工作？(立即生效)")) { await postAction({ action: 'delete_shift', shiftId: document.getElementById('modalShiftId').value }); closeShiftModal(); } }); }
 
+function saveDailyRemark(shiftId, topVal, bottomVal) { const existing = appData.shifts.find(s => s['排班ID'] === shiftId) || {}; markDraft({ shiftId, date: document.getElementById('interactiveDate').value, dept: currentDept, empId: 'SYS_REMARK', task: 'SYS_REMARK', start: '00:00', end: '00:00', category: 'SYS', remark1: topVal !== null ? topVal : (existing['備註'] || ''), remark2: bottomVal !== null ? bottomVal : (existing['備註2'] || '') }); }
+function updateShiftRemarks(shiftId, r1, r2) { const shift = appData.shifts.find(s => s['排班ID'] === shiftId); if(shift) { markDraft({ shiftId, date: shift['日期'], dept: shift['部門名稱'], empId: shift['員工編號'], task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: r1 !== null ? r1 : shift['備註'], remark2: r2 !== null ? r2 : shift['備註2'] }); } }
+function copyShift(shiftId) { clipboardShift = appData.shifts.find(s => s['排班ID'] === shiftId); showToast("✅ 已複製"); renderInteractiveGrid(); }
+function pasteShift(empId) { if (!clipboardShift) return; openShiftModal(); updateModalEmp(empId); document.getElementById('modalTask').value = clipboardShift['工作名稱']; document.getElementById('modalStart').value = clipboardShift['開始時間']; document.getElementById('modalEnd').value = clipboardShift['結束時間']; document.getElementById('modalCat').value = clipboardShift['工作類別']; document.getElementById('modalRemark1').value = clipboardShift['備註'] || ''; document.getElementById('modalRemark2').value = clipboardShift['備註2'] || ''; document.getElementById('modalTitle').innerText = '📋 貼上工作'; }
+function allowDrop(ev) { ev.preventDefault(); }
+function dragRow(ev, empId) { ev.dataTransfer.setData("rowEmpId", empId); }
+function dropRow(ev, targetEmpId) { ev.preventDefault(); ev.stopPropagation(); const sourceEmpId = ev.dataTransfer.getData("rowEmpId"); if (sourceEmpId && sourceEmpId !== targetEmpId) { if (!customStaffOrder.includes(sourceEmpId)) customStaffOrder.push(sourceEmpId); if (!customStaffOrder.includes(targetEmpId)) customStaffOrder.push(targetEmpId); const sourceIdx = customStaffOrder.indexOf(sourceEmpId); const targetIdx = customStaffOrder.indexOf(targetEmpId); if (sourceIdx !== -1 && targetIdx !== -1) { customStaffOrder.splice(sourceIdx, 1); customStaffOrder.splice(targetIdx, 0, sourceEmpId); renderInteractiveGrid(); } } }
+function dragShift(ev, shiftId) { ev.dataTransfer.setData("shiftId", shiftId); ev.stopPropagation(); }
+function dropShift(ev, newEmpId) { ev.preventDefault(); const shiftId = ev.dataTransfer.getData("shiftId"); if(!shiftId) return; const shift = appData.shifts.find(s => s['排班ID'] === shiftId); if(shift && shift['員工編號'] !== newEmpId) { markDraft({ shiftId: shift['排班ID'], date: shift['日期'], dept: shift['部門名稱'], empId: newEmpId, task: shift['工作名稱'], start: shift['開始時間'], end: shift['結束時間'], category: shift['工作類別'], remark1: shift['備註'], remark2: shift['備註2'] }); renderInteractiveGrid(); } }
+
 function openRowActionModal(empId) {
     if (empId === '') return;
     const emp = appData.staff.find(e => e['員工編號'] === empId); if(!emp) return;
     document.getElementById('raEmpId').value = empId; document.getElementById('raEmpName').innerText = emp['姓名'];
-    const { deptStaffMap } = getMixedDeptStaff(document.getElementById('interactiveDate').value.substring(0, 7));
-    document.getElementById('raReplaceEmp').innerHTML = '<option value="">--請選擇接收人員--</option>' + buildEmpSelectOptions(deptStaffMap, '');
+    
+    // 初始化清空移交選單
+    document.getElementById('raReplaceEmp').value = '';
+    document.getElementById('txtRaReplaceEmp').innerText = '-- 點擊搜尋接收人員 --';
+    
     document.getElementById('rowActionModal').classList.remove('hidden');
 }
 function openQuickEmpFromAction() { document.getElementById('rowActionModal').classList.add('hidden'); openQuickEmpEdit(document.getElementById('raEmpId').value); }
