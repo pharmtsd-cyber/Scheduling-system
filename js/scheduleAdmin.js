@@ -2,6 +2,7 @@ let currentAdminTab = 'daily';
 let currentViewMode = 'timeline'; 
 let studioShifts = []; 
 let engineSpecificDates = []; 
+let clipboardShift = null; // ★ 補回遺漏的剪貼簿變數
 
 function openAdminDept(deptName) {
     currentDept = deptName;
@@ -238,7 +239,7 @@ function initResize(e, shiftId, edge) {
 function handleResize(e) {
     if(!resizeState) return;
     const dx = e.clientX - resizeState.startX;
-    const minsDelta = Math.round((dx / resizeState.trackWidth) * 840 / 15) * 15; // 840 = 14hr * 60m
+    const minsDelta = Math.round((dx / resizeState.trackWidth) * 840 / 15) * 15;
     const shift = getActiveShifts(resizeState.targetDate).find(s => s['排班ID'] === resizeState.shiftId);
     if(resizeState.edge === 'start') {
         let newStart = resizeState.startMins + minsDelta;
@@ -290,7 +291,6 @@ function renderTimelineView() {
     for(let i=8; i<=21; i++) html += `<div class="flex-1 border-l border-slate-300 pl-1 py-1">${i}:00</div><div class="flex-1 border-l border-dashed border-slate-300 pl-1 py-1 text-[9px] text-slate-400">30</div>`;
     html += `<div class="w-8 border-l border-slate-300 pl-1 py-1">22</div></div><div class="w-40 p-2 border-l text-center shrink-0 flex items-center justify-center text-teal-800 bg-teal-100/80 backdrop-blur">工作補充</div></div>`;
 
-    // 區分工作池(未指派) 與 實體人員
     let poolRows = [];
     shifts.filter(s => s['員工編號'] === '').forEach(shift => { poolRows.push({ '員工編號': '', '姓名': '待分發工作', '所屬單位': currentDept, '所屬組別': currentDept, isDummy: true, rowId: shift['排班ID'], shiftData: shift }); });
     
@@ -312,9 +312,8 @@ function renderTimelineView() {
             `<span class="text-blue-800 font-bold w-full text-center tracking-wide">${emp['姓名']}</span>`;
 
         let dragProps = isDummy ? '' : `draggable="true" ondragstart="dragRow(event, '${emp.rowId}')" ondragover="allowDrop(event)" ondrop="dropRow(event, '${emp.rowId}')"`;
-        let pasteBtnHtml = (clipboardShift && !isDummy) ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[10px] bg-indigo-600 text-white px-2 py-0.5 mt-1 rounded shadow-md hover:bg-indigo-700 transition absolute bottom-0.5">📋 直接貼上</button>` : '';
+        let pasteBtnHtml = (clipboardShift && !isDummy) ? `<button onclick="pasteShift('${emp['員工編號']}')" class="text-[10px] bg-indigo-600 text-white px-2 py-0.5 mt-1 rounded shadow-md hover:bg-indigo-700 transition absolute bottom-0.5 z-20">📋 貼上</button>` : '';
 
-        // ★ 智慧防呆衝突偵測
         let overlapIds = new Set();
         if (!isDummy) {
             for(let i=0; i<myShifts.length; i++){
