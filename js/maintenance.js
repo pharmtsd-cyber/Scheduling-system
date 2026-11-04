@@ -71,7 +71,7 @@ function renderTaskList() {
     if (catFilter !== 'ALL') tasks = tasks.filter(t => (t['預設類別'] || '') === catFilter);
     if (keyword) tasks = tasks.filter(t => t['工作名稱'].toLowerCase().includes(keyword) || (t['預設類別']||'').toLowerCase().includes(keyword));
     
-    // ★ 排序：依據部門 -> 類別 -> 名稱排序
+    // 排序：依據部門 -> 類別 -> 名稱排序
     tasks.sort((a, b) => {
         const deptCmp = (a['部門名稱'] || '').localeCompare(b['部門名稱'] || '');
         if (deptCmp !== 0) return deptCmp;
@@ -141,7 +141,10 @@ async function saveTask() {
         if(isExist) return alert("此工作名稱已經存在本部門，請更換名稱。");
     }
     
-    await postAction({ action: 'save_task', taskId: taskId || Utilities.getUuid().substring(0,8), oldTaskName: oldName, taskName, category, dept: deptInput, status });
+    // ★ 已修復：使用前端原生語法取代 Utilities 避免報錯
+    const safeTaskId = taskId || ('TK' + new Date().getTime());
+    
+    await postAction({ action: 'save_task', taskId: safeTaskId, oldTaskName: oldName, taskName, category, dept: deptInput, status });
     resetTaskForm(); showTaskMaint();
 }
 
