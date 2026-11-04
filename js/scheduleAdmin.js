@@ -2,7 +2,7 @@ let currentAdminTab = 'daily';
 let currentViewMode = 'timeline'; 
 let studioShifts = []; 
 let engineSpecificDates = []; 
-let clipboardShift = null; // ★ 補回遺漏的剪貼簿變數
+let clipboardShift = null; 
 
 function openAdminDept(deptName) {
     currentDept = deptName;
@@ -96,7 +96,8 @@ function handleUnifiedAction(action, dateContext, ...args) {
     const targetDate = currentAdminTab === 'template' ? 'TEMPLATE' : (dateContext || document.getElementById('viewTimelineDate').value);
     
     guardUnifiedAction(targetDate, () => {
-        if (action === 'add_shift') { openShiftModal(null, targetDate); }
+        // ★ 修復：如果有傳入排班ID (args[0])，就帶入給 Modal，讓它識別為編輯模式
+        if (action === 'add_shift') { openShiftModal(args[0] || null, targetDate); }
         else if (action === 'update_remarks') {
             const empId = args[0]; const r1 = args[1]; const r2 = args[2];
             if(!empId) return;
@@ -126,9 +127,17 @@ function handleUnifiedAction(action, dateContext, ...args) {
         }
         else if (action === 'delete_shift') {
             const shiftId = args[0];
-            if (currentAdminTab === 'template') studioShifts = studioShifts.filter(s => s['排班ID'] !== shiftId);
-            else appData.shifts = appData.shifts.filter(s => s['排班ID'] !== shiftId);
-            closeShiftModal(); renderUnifiedGrid();
+            if (currentAdminTab === 'template') {
+                studioShifts = studioShifts.filter(s => s['排班ID'] !== shiftId);
+                closeShiftModal(); renderUnifiedGrid();
+            } else {
+                // ★ 修復：每日排班模式刪除，除了畫面移除外，同步觸發雲端刪除，確保不會重生
+                if(confirm("確定要刪除此工作嗎？(刪除將立即寫入雲端)")) {
+                    appData.shifts = appData.shifts.filter(s => s['排班ID'] !== shiftId);
+                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_shift', shiftId: shiftId }) }).catch(e=>console.error(e));
+                    closeShiftModal(); renderUnifiedGrid();
+                }
+            }
         }
     });
 }
